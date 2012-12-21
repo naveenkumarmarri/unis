@@ -342,6 +342,8 @@ class JSONSchemaModel(ObjectDict):
     
     def _validate(self):
         """Validate the value of this instance to match the schema."""
+        if self._schema_data.get('additionalProperties', None) is None:
+            self._schema_data['additionalProperties'] = False
         validictory.validate(self, self._schema_data, required_by_default=False)
     
     @staticmethod
