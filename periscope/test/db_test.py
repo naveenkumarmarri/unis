@@ -30,19 +30,19 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
     def test_insert(self):
         def handle_insert(response, error=None):
             self.assertIsNone(error)
-            self.assertEqual(response[0]['ok'], 1.0)
+            self.assertEqual(response, '1')
             self.stop()
 
         model = DBLayer(self.async_db, self.collection_name)
         self.assertEqual(model.collection.full_collection_name,
                     self.async_db[self.collection_name].full_collection_name)
-        model.insert(data={"id": "1", "two": 2},  callback=handle_insert)
+        model.insert({"_id": "1", "id": "1", "two": 2},  callback=handle_insert)
         self.wait()
 
     def test_delete(self):
         def handle_delete(response, error=None):
             self.assertIsNone(error)
-            self.assertEqual(response[0]['ok'], 1.0)
+            self.assertEqual(response['ok'], 1.0)
             self.stop()
 
         self.sync_db[self.collection_name].insert({"two": 2})
@@ -71,7 +71,7 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
     def test_update(self):
         def handle_update(response, error=None):
             self.assertIsNone(error)
-            self.assertEqual(response[0]['ok'], 1.0)
+            self.assertEqual(response['ok'], 1.0)
             self.stop()
 
         self.sync_db[self.collection_name].insert({"num": 1})
@@ -82,7 +82,7 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
     def test_remove(self):
         def handle_remove(response, error=None):
             self.assertIsNone(error)
-            self.assertEqual(response[0]['ok'], 1.0)
+            self.assertEqual(response['ok'], 1.0)
             self.stop()
 
         self.sync_db[self.collection_name].insert({"num": 1})
@@ -138,9 +138,11 @@ class DBLayerTest(PeriscopeTestCase):
         expected = [{"_id": "2", "num": 2}, {"_id": "3", "num": 3}]
         query = {"num": {"$gte": 2},}
         collection_name = "collection_find"
+        cursor = Mock(name="cursor"+collection_name)
         collection = Mock(name=collection_name)
-        collection.find.return_value = None
-        collection.find.side_effect = lambda *args, **kwargs: kwargs['callback'](response, error=None)
+        collection.find.return_value = cursor
+        #collection.find.side_effect = lambda *args, **kwargs: kwargs['callback'](response, error=None)
+        cursor.to_list.side_effect = lambda *args, **kwargs: kwargs['callback'](response, error=None)
         client = {collection_name: collection}
         callback = Mock(name="find_callback")
         callback.side_effect = lambda response, error : self.stop()

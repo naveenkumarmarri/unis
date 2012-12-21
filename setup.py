@@ -19,7 +19,7 @@ version = "0.1.dev"
 setup(
     name="periscope",
     version=version,
-    packages=["periscope", "periscope.test"],
+    packages=["periscope", "periscope.handlers", "periscope.test"],
     package_data={},
     author="Ahmed El-Hassany",
     author_email="ahassany@indiana.edu",
@@ -30,7 +30,8 @@ setup(
     
     install_requires=[
         "tornado",
-        "pymongo",
+        "greenlet",
+        "pymongo>=2.4.1",
         "asyncmongo",
         "unittest2",
         "netlogger>=4.3.0",
@@ -43,6 +44,7 @@ setup(
     ],
     dependency_links=[
         "http://github.com/ahassany/asyncmongo/tarball/getmore_ioloop#egg=asyncmongo-1.2.1",
+        "http://github.com/ajdavis/mongo-python-driver/tarball/motor#egg=pymongo-2.4.1"
     ],
     entry_points = {
         'console_scripts': [

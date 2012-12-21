@@ -26,6 +26,8 @@ else:
     import json
     dumps_mongo = functools.partial(json.dumps, cls=MongoEncoder)
 
+import motor
+
 class DBLayer(object, nllog.DoesLogging):
     """Thin layer asynchronous model to handle network objects.
 
@@ -57,8 +59,9 @@ class DBLayer(object, nllog.DoesLogging):
         self.log.info("find")
         fields = kwargs.pop("fields", {})
         fields["_id"] = 0
-        return self.collection.find(query, callback=callback,
+        cursor = self.collection.find(query,
                                     fields=fields, **kwargs)
+        return cursor.to_list(length=None, callback=callback)
 
     def _insert_id(self, data):
         if "_id" not in data and not self.capped:
@@ -74,8 +77,6 @@ class DBLayer(object, nllog.DoesLogging):
                 self._insert_id(item)
         elif not self.capped:
             self._insert_id(data)
-            
-        
         return self.collection.insert(data, callback=callback, **kwargs)
 
     def update(self, query, data, callback=None, **kwargs):

@@ -1,7 +1,7 @@
 """
 Basic classes for unit testing.
 """
-import asyncmongo
+import motor
 import pymongo
 import random
 import tornado.web
@@ -29,10 +29,11 @@ class PeriscopeTestCase(AsyncTestCase, unittest2.TestCase):
     
     @property
     def async_db(self):
-        """Returns a reference to asyncmongo DB connection."""
+        """Returns a reference to motor DB connection."""
         if not getattr(self, '_async_db', None):
-            self._async_db = asyncmongo.Client(**settings.ASYNC_DB)
-        return self._async_db
+            conn = motor.MotorClient(**settings.ASYNC_DB).open_sync()
+            self._motor = conn[settings.DB_NAME]
+        return self._motor
 
     @property
     def sync_db(self):
@@ -58,17 +59,12 @@ class PeriscopeHTTPTestCase(PeriscopeTestCase, AsyncHTTPTestCase):
             
             @property
             def async_db(self):
-                """Returns a reference to asyncmongo DB connection."""
+                """Returns a reference to motor DB connection."""
                 if not getattr(self, '_async_db', None):
-                    if hasattr(self, 'io_loop'):
-                        # Unit testint is going to create different IOLoop instances
-                        # for each test case, thus we need to make sure that different 
-                        # connection pools is used
-                        settings.ASYNC_DB['io_loop'] = self.io_loop
-                        settings.ASYNC_DB['pool_id'] = "pool_" \
-                                    "%d" % int(random.random() * 100000)
-                    self._async_db = asyncmongo.Client(**settings.ASYNC_DB)
-                return self._async_db
+                    conn = motor.MotorClient(**settings.ASYNC_DB).open_sync()
+                    self._motor = conn[settings.DB_NAME]
+                return self._motor
+                #return self._async_db
 
             @property
             def sync_db(self):

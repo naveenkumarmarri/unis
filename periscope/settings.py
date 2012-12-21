@@ -53,15 +53,15 @@ DB_NAME = "periscope_db"
 DB_HOST = "127.0.0.1"
 DB_PORT = 27017
 
-# Asyncmongo specific connection configurations
+# Motor specific connection configurations
 ASYNC_DB = {
-    'pool_id': DB_HOST + "_pool",
+    #'pool_id': DB_HOST + "_pool",
     'host': DB_HOST,
     'port': DB_PORT,
-    'mincached': 1,
-    'maxcached': 50,
-    'maxconnections': 250,
-    'dbname': DB_NAME,
+    #'mincached': 1,
+    #'maxcached': 50,
+    'max_pool_size': 250,
+    #'dbname': DB_NAME,
 }
 
 # Pymonog specific connection configurations

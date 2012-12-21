@@ -1,8 +1,8 @@
 """
 Main Periscope Application
 """
-import asyncmongo
 import pymongo
+import motor
 import tornado.web
 import tornado.ioloop
 import json
@@ -238,9 +238,10 @@ class PeriscopeApplication(tornado.web.Application):
     
     @property
     def async_db(self):
-        """Returns a reference to asyncmongo DB connection."""
+        """Returns a reference to motor DB connection."""
         if not getattr(self, '_async_db', None):
-            self._async_db = asyncmongo.Client(**settings.ASYNC_DB)
+            conn = motor.MotorClient(**settings.ASYNC_DB).open_sync()
+            self._async_db = conn[settings.DB_NAME]
         return self._async_db
 
     @property
