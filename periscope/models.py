@@ -378,7 +378,8 @@ class SchemasLoader(object):
     
     def get(self, uri):
         if uri in self.__CACHE__:
-            return self.__CACHE__[uri]
+            if self.__CACHE__[uri].get("extends", None) is None:
+                return self.__CACHE__[uri]
         location = self.__LOCATIONS__.get(uri, uri)
         return self._load_schema(location)
     
