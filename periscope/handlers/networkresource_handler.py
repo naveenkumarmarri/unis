@@ -148,9 +148,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             if "*/*" in accept:
                 self._accept = MIME['JSON']
             if not self._accept:
-                raise HTTPError(406,
-                    "Unsupported accept content type '%s'" %
-                    self.request.headers.get("Accept", None))
+                self._accept = self.request.headers.get("Accept", None)
         return self._accept
 
     @property
@@ -210,6 +208,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.finish()
         else:
             content_type = self.accept_content_type or MIME['PSJSON']
+            if content_type not in self.schemas_single:
+                content_type = MIME['PSJSON']
             self.set_header("Content-Type", content_type)
             result = "{"
             for key in kwargs:
@@ -547,10 +547,11 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     @tornado.web.removeslash
     def post(self, res_id=None):
         # Check if the schema for conetnt type is known to the server
-        if self.accept_content_type not in self.schemas_single:
-            message = "Schema is not defiend fot content of type '%s'" % \
-                        (self.accept_content_type)
-            self.send_error(500, message=message)
+        accept_content_type = self.accept_content_type 
+        if accept_content_type not in self.schemas_single:
+            message = "Unsupported accept content type '%s'" % \
+                        (accept_content_type)
+            self.send_error(406, message=message)
             return
         # POST requests don't work on specific IDs
         if res_id:

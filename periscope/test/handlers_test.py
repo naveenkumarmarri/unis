@@ -528,6 +528,7 @@ class NetworkResourceHandlerTest(PeriscopeHTTPTestCase):
         psxml_ret = psxml_handler.accept_content_type
         html_ret = html_handler.accept_content_type
         multi_ret = multi_handler.accept_content_type
+        text_ret = text_handler.accept_content_type
         
         # Assert
         self.assertEqual(wildcard_ret, MIME['JSON'])
@@ -535,7 +536,8 @@ class NetworkResourceHandlerTest(PeriscopeHTTPTestCase):
         self.assertEqual(psxml_ret, MIME['PSXML'])
         self.assertEqual(html_ret, MIME['HTML'])
         self.assertEqual(multi_ret, MIME['PSXML'])
-        self.assertRaises(HTTPError, lambda : text_handler.accept_content_type)
+        self.assertEqual(text_ret, MIME['PLAIN'])
+                
     
     def test_content_type(self):
         # Arrange
