@@ -570,11 +570,12 @@ class NetworkResourceHandlerTest(PeriscopeHTTPTestCase):
         # Act
         psjson_ret = psjson_handler.content_type
         psxml_ret = psxml_handler.content_type
+        text_ret = text_handler.content_type
         
         # Assert        
         self.assertEqual(psjson_ret, MIME['PSJSON'])
         self.assertEqual(psxml_ret, MIME['PSXML'])
-        self.assertRaises(HTTPError, lambda : text_handler.content_type)
+        self.assertEqual(text_ret, MIME['PLAIN'])
     
     def test_supports_streaming(self):
         # Arrange

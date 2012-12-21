@@ -179,9 +179,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
                 if accepted_mime in content_type:
                     self._content_type = accepted_mime
                     return self._content_type
-            raise HTTPError(415,
-                "Unsupported content type '%s'" %
-                    self.request.headers.get("Content-Type", ""))
+            self._content_type = raw
         return self._content_type
 
     @property
@@ -561,11 +559,12 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
 
         # Load the appropriate content type specific POST handler
-        if self.content_type == MIME['PSJSON']:
+        content_type = self.content_type
+        if content_type == MIME['PSJSON']:
             self.post_psjson()
         else:
-            self.send_error(500,
-                message="No POST method is implemented fot this content type")
+            self.send_error(415,
+                message="No POST method is implemented fot content type '%s'" % content_type)
             return
         return
 
