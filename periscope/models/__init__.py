@@ -9,24 +9,8 @@ import validictory
 import functools
 import httplib2
 from periscope.utils import json_schema_merge_extends
+from periscope.settings import SCHEMAS
 from periscope.settings import JSON_SCHEMAS_ROOT
-
-
-SCHEMAS = {
-    'networkresource': 'http://unis.incntre.iu.edu/schema/20120709/networkresource#',
-    'node': 'http://unis.incntre.iu.edu/schema/20120709/node#',
-    'domain': 'http://unis.incntre.iu.edu/schema/20120709/domain#',
-    'port': 'http://unis.incntre.iu.edu/schema/20120709/port#',
-    'link': 'http://unis.incntre.iu.edu/schema/20120709/link#',
-    'network': 'http://unis.incntre.iu.edu/schema/20120709/network#',
-    'topology': 'http://unis.incntre.iu.edu/schema/20120709/topology#',
-    'service': 'http://unis.incntre.iu.edu/schema/20120709/service#',
-    'path': 'http://unis.incntre.iu.edu/schema/20120709/path#',
-    'blipp': 'http://unis.incntre.iu.edu/schema/20120709/blipp#',
-    'metadata': 'http://unis.incntre.iu.edu/schema/20120709/metadata#',
-    'data' : 'http://unis.incntre.iu.edu/schema/20120709/data#',
-    'datum' : 'http://unis.incntre.iu.edu/schema/20120709/datum#',
-}
 
 
 class HyperLinkNotFound(Exception):

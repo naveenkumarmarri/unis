@@ -11,7 +11,7 @@ from periscope.db import object_id
 from periscope.models import JSONSchemaModel
 from periscope.models import schemaLoader
 from periscope.models import schemaMetaFactory
-from periscope.models import SCHEMAS
+from periscope.settings import SCHEMAS
 
 
 METADATA_SCHEMA = schemaLoader.get(SCHEMAS["metadata"])
