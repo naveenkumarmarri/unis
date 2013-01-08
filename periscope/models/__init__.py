@@ -12,7 +12,7 @@ import validictory
 import functools
 import httplib2
 from periscope.utils import json_schema_merge_extends
-from settings import JSON_SCHEMAS_ROOT
+from periscope.settings import JSON_SCHEMAS_ROOT
 
 import pymongo
 if pymongo.version_tuple[1] > 1:
@@ -478,23 +478,10 @@ HyperLink = schemaLoader.get_class(
 JSONRef = schemaLoader.get_class(
     "http://json-schema.org/draft-03/json-ref#", "JSONRef")
 
-# Load the basic Network Resources defined by UNIS
-NetworkResourceMeta = schemaMetaFactory("NetworkResourceMeta",  schema=schemaLoader.get(SCHEMAS["networkresource"]))
+
 MetadataMeta = schemaMetaFactory("MetadataMeta",  schema=schemaLoader.get(SCHEMAS["metadata"]))
 
-class NetworkResource(JSONSchemaModel):
-    __metaclass__ = NetworkResourceMeta
-    def __init__(self, data=None, set_defaults=True, schemas_loader=None,
-        auto_id=True, auto_ts=True):
-        JSONSchemaModel.__init__(self, 
-            data=data,
-            set_defaults=set_defaults,
-            schemas_loader=schemas_loader
-        )
-        if auto_id:
-            self.id = self.id or str(ObjectId())
-        if auto_ts:
-            self.ts = self.ts or int(time.time() * 1000000)
+
 
 class Metadata(JSONSchemaModel):
     __metaclass__ = MetadataMeta
@@ -510,13 +497,4 @@ class Metadata(JSONSchemaModel):
         if auto_ts:
             self.ts = self.ts or int(time.time() * 1000000)
 
-Node = schemaLoader.get_class(SCHEMAS["node"], extends=NetworkResource)
-Link = schemaLoader.get_class(SCHEMAS["link"], extends=NetworkResource)
-Port = schemaLoader.get_class(SCHEMAS["port"], extends=NetworkResource)
-Path = schemaLoader.get_class(SCHEMAS["path"], extends=NetworkResource)
-Service = schemaLoader.get_class(SCHEMAS["service"], extends=NetworkResource)
-Network = schemaLoader.get_class(SCHEMAS["network"], extends=Node)
-Domain = schemaLoader.get_class(SCHEMAS["domain"], extends=NetworkResource)
-Topology = schemaLoader.get_class(SCHEMAS["topology"], extends=NetworkResource)
-Event = schemaLoader.get_class(SCHEMAS["datum"], extends=NetworkResource)
-Data = schemaLoader.get_class(SCHEMAS["data"], extends=NetworkResource)
+
