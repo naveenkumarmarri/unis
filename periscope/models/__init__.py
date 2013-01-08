@@ -2,11 +2,8 @@
 """
 Database models.
 """
-import copy
-import time
-from json import JSONEncoder
+
 import json
-import time
 import re
 import validictory
 import functools
@@ -14,11 +11,6 @@ import httplib2
 from periscope.utils import json_schema_merge_extends
 from periscope.settings import JSON_SCHEMAS_ROOT
 
-import pymongo
-if pymongo.version_tuple[1] > 1:
-    from bson.objectid import ObjectId
-else:
-    from pymongo.objectid import ObjectId
 
 SCHEMAS = {
     'networkresource': 'http://unis.incntre.iu.edu/schema/20120709/networkresource#',
@@ -477,24 +469,3 @@ HyperLink = schemaLoader.get_class(
     "http://json-schema.org/draft-03/links#", "HyperLink")
 JSONRef = schemaLoader.get_class(
     "http://json-schema.org/draft-03/json-ref#", "JSONRef")
-
-
-MetadataMeta = schemaMetaFactory("MetadataMeta",  schema=schemaLoader.get(SCHEMAS["metadata"]))
-
-
-
-class Metadata(JSONSchemaModel):
-    __metaclass__ = MetadataMeta
-    def __init__(self, data=None, set_defaults=True, schemas_loader=None,
-        auto_id=True, auto_ts=True):
-        JSONSchemaModel.__init__(self, 
-            data=data,
-            set_defaults=set_defaults,
-            schemas_loader=schemas_loader
-        )
-        if auto_id:
-            self.id = self.id or str(ObjectId())
-        if auto_ts:
-            self.ts = self.ts or int(time.time() * 1000000)
-
-
