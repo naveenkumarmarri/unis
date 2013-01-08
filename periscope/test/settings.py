@@ -6,14 +6,20 @@ DB_HOST = "127.0.0.1"
 DB_PORT = 27017
 
 # Motor specific connection configurations
-ASYNC_DB = {
-    #'pool_id': DB_HOST + "_pool",
+MOTOR_DB = {
     'host': DB_HOST,
     'port': DB_PORT,
-    #'mincached': 1,
-    #'maxcached': 10,
-    #'maxconnections': 50,
-    #'dbname': DB_NAME,
+}
+
+# Asyncmongo specific connection configurations
+ASYNC_DB = {
+    'pool_id': DB_HOST + "_pool",
+    'host': DB_HOST,
+    'port': DB_PORT,
+    'mincached': 1,
+    'maxcached': 10,
+    'maxconnections': 50,
+    'dbname': DB_NAME,
 }
 
 # Pymonog specific connection configurations
