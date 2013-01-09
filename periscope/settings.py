@@ -164,7 +164,7 @@ links = dict(default_resource_settings.items() + \
         {
             "name": "links",
             "pattern": "/links$", # The regex used to match the handler in URI
-            "model_class": "periscope.models.Link", # The name of the database collection
+            "model_class": "periscope.models.unis.Link", # The name of the database collection
             "collection_name": "links",
             "schema": {MIME['PSJSON']: SCHEMAS["link"]}, # JSON Schema fot this resource
         }.items()
@@ -173,7 +173,7 @@ link = dict(default_resource_settings.items() + \
         {
             "name": "link",
             "pattern": "/links/(?P<res_id>[^\/]*)$",
-            "model_class": "periscope.models.Link",
+            "model_class": "periscope.models.unis.Link",
             "collection_name": "links",
             "schema": {MIME['PSJSON']: SCHEMAS["link"]},
         }.items()
@@ -182,7 +182,7 @@ ports = dict(default_resource_settings.items() + \
         {
             "name": "ports",
             "pattern": "/ports$",
-            "model_class": "periscope.models.Port",
+            "model_class": "periscope.models.unis.Port",
             "collection_name": "ports",
             "schema": {MIME['PSJSON']: SCHEMAS["port"]},
         }.items()
@@ -191,7 +191,7 @@ port = dict(default_resource_settings.items() + \
         {
             "name": "port",
             "pattern": "/ports/(?P<res_id>[^\/]*)$",
-            "model_class": "periscope.models.Port",
+            "model_class": "periscope.models.unis.Port",
             "collection_name": "ports",
             "schema": {MIME['PSJSON']: SCHEMAS["port"]},
         }.items()
@@ -200,7 +200,7 @@ nodes = dict(default_resource_settings.items() + \
         {
             "name": "nodes",
             "pattern": "/nodes$",
-            "model_class": "periscope.models.Node",
+            "model_class": "periscope.models.unis.Node",
             "collection_name": "nodes",
             "schema": {MIME['PSJSON']: SCHEMAS["node"]},
         }.items()
@@ -209,7 +209,7 @@ node = dict(default_resource_settings.items() + \
         {
             "name": "node",
             "pattern": "/nodes/(?P<res_id>[^\/]*)$",
-            "model_class": "periscope.models.Node",
+            "model_class": "periscope.models.unis.Node",
             "collection_name": "nodes",
             "schema": {MIME['PSJSON']: SCHEMAS["node"]},
         }.items()
@@ -218,7 +218,7 @@ services = dict(default_resource_settings.items() + \
         {
             "name": "services",
             "pattern": "/services$",
-            "model_class": "periscope.models.Service",
+            "model_class": "periscope.models.unis.Service",
             "collection_name": "services",
             "schema": {MIME['PSJSON']: SCHEMAS["service"]},
         }.items()
@@ -227,7 +227,7 @@ service = dict(default_resource_settings.items() + \
         {
             "name": "service",
             "pattern": "/services/(?P<res_id>[^\/]*)$",
-            "model_class": "periscope.models.Service",
+            "model_class": "periscope.models.unis.Service",
             "collection_name": "services",
             "schema": {MIME['PSJSON']: SCHEMAS["service"]},
         }.items()
@@ -236,7 +236,7 @@ paths = dict(default_resource_settings.items() + \
         {
             "name": "paths",
             "pattern": "/paths$",
-            "model_class": "periscope.models.Path",
+            "model_class": "periscope.models.unis.Path",
             "collection_name": "paths",
             "schema": {MIME['PSJSON']: SCHEMAS["path"]},
         }.items()
@@ -245,7 +245,7 @@ path = dict(default_resource_settings.items() + \
         {
             "name": "path",
             "pattern": "/paths/(?P<res_id>[^\/]*)$",
-            "model_class": "periscope.models.Path",
+            "model_class": "periscope.models.unis.Path",
             "collection_name": "paths",
             "schema": {MIME['PSJSON']: SCHEMAS["path"]},
         }.items()
@@ -255,7 +255,7 @@ networks = dict(default_resource_settings.items() + \
             "name": "networks",
             "pattern": "/networks$",
             "handler_class": "periscope.handlers.CollectionHandler",
-            "model_class": "periscope.models.Network",
+            "model_class": "periscope.models.unis.Network",
             "collection_name": "networks",
             "schema": {MIME['PSJSON']: SCHEMAS["network"]},
             "collections": {},
@@ -266,7 +266,7 @@ network = dict(default_resource_settings.items() + \
             "name": "network",
             "pattern": "/networks/(?P<res_id>[^\/]*)$",
             "handler_class": "periscope.handlers.CollectionHandler",
-            "model_class": "periscope.models.Network",
+            "model_class": "periscope.models.unis.Network",
             "collection_name": "networks",
             "schema": {MIME['PSJSON']: SCHEMAS["network"]},
             "collections": {},
@@ -277,7 +277,7 @@ domains = dict(default_resource_settings.items() + \
             "name": "domains",
             "pattern": "/domains$",
             "handler_class": "periscope.handlers.CollectionHandler",
-            "model_class": "periscope.models.Domain",
+            "model_class": "periscope.models.unis.Domain",
             "collection_name": "domains",
             "schema": {MIME['PSJSON']: SCHEMAS["domain"]},
             "collections": {},
@@ -288,7 +288,7 @@ domain = dict(default_resource_settings.items() + \
             "name": "domain",
             "pattern": "/domains/(?P<res_id>[^\/]*)$",
             "handler_class": "periscope.handlers.CollectionHandler",
-            "model_class": "periscope.models.Domain",
+            "model_class": "periscope.models.unis.Domain",
             "collection_name": "domains",
             "schema": {MIME['PSJSON']: SCHEMAS["domain"]},
             "collections": {},
@@ -299,7 +299,7 @@ topologies = dict(default_resource_settings.items() + \
             "name": "topologies",
             "pattern": "/topologies$",
             "handler_class": "periscope.handlers.CollectionHandler",
-            "model_class": "periscope.models.Topology",
+            "model_class": "periscope.models.unis.Topology",
             "collection_name": "topologies",
             "schema": {MIME['PSJSON']: SCHEMAS["topology"]},
             "collections": {},
@@ -310,7 +310,7 @@ topology = dict(default_resource_settings.items() + \
             "name": "topology",
             "pattern": "/topologies/(?P<res_id>[^\/]*)$",
             "handler_class": "periscope.handlers.CollectionHandler",
-            "model_class": "periscope.models.Topology",
+            "model_class": "periscope.models.unis.Topology",
             "collection_name": "topologies",
             "schema": {MIME['PSJSON']: SCHEMAS["topology"]},
             "collections": {},
@@ -321,7 +321,7 @@ metadatas = dict(default_resource_settings.items() + \
         {
             "name": "metadatas",
             "pattern": "/metadata$", 
-            "model_class": "periscope.models.Metadata",
+            "model_class": "periscope.models.ms.Metadata",
             "collection_name": "metadata",
             "schema": {MIME['PSJSON']: SCHEMAS["metadata"]},
         }.items()
@@ -330,7 +330,7 @@ metadata = dict(default_resource_settings.items() + \
         {
             "name": "metadata",
             "pattern": "/metadata/(?P<res_id>[^\/]*)$",
-            "model_class": "periscope.models.Metadata",
+            "model_class": "periscope.models.ms.Metadata",
             "collection_name": "metadata",
             "schema": {MIME['PSJSON']: SCHEMAS["metadata"]},
         }.items()
@@ -341,7 +341,7 @@ events = dict(default_resource_settings.items() + \
             "name": "events",
             "pattern": "/events$", 
             "handler_class" : "periscope.handlers.EventsHandler",
-            "model_class": "periscope.models.Event",
+            "model_class": "periscope.models.ms.Event",
             "collection_name": "events_cache",
             "schema": {MIME['PSJSON']: SCHEMAS["datum"]},
         }.items()
@@ -352,7 +352,7 @@ event = dict(default_resource_settings.items() + \
             "name": "event",
             "pattern": "/events/(?P<res_id>[^\/]*)$",
             "handler_class" : "periscope.handlers.EventsHandler",
-            "model_class": "periscope.models.Event",
+            "model_class": "periscope.models.ms.Event",
             "collection_name": None,
             "schema": {MIME['PSJSON']: SCHEMAS["datum"]},
         }.items()
@@ -363,7 +363,7 @@ datas = dict(default_resource_settings.items() + \
             "name": "datas",
             "pattern": "/data$", 
             "handler_class" : "periscope.handlers.DataHandler",
-            "model_class": "periscope.models.Data",
+            "model_class": "periscope.models.ms.Data",
             "collection_name": None,
             "schema": {MIME['PSJSON']: SCHEMAS["data"]},
         }.items()
@@ -374,7 +374,7 @@ data = dict(default_resource_settings.items() + \
             "name": "data",
             "pattern": "/data/(?P<res_id>[^\/]*)$",
             "handler_class" : "periscope.handlers.DataHandler",
-            "model_class": "periscope.models.Data",
+            "model_class": "periscope.models.ms.Data",
             "collection_name": None,
             "schema": {MIME['PSJSON']: SCHEMAS["data"]},
         }.items()
