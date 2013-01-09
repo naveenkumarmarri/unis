@@ -326,7 +326,7 @@ class DataHandler(NetworkResourceHandler):
             self.send_error(400, message="malformatted json request '%s'." % exp)
             return
         if self._res_id:
-            res_refs =[]
+            res_refs = []
             if self._res_id in self.application.sync_db.collection_names():
                 callback = functools.partial(self.on_post,
                         res_refs=res_refs, return_resources=False,last=True)
@@ -352,7 +352,7 @@ class DataHandler(NetworkResourceHandler):
             mids = data.keys()
             
             for i in range(0,mids.__len__()):    
-                res_refs =[]
+                res_refs = []
                 if mids[i] in col_names:
                     if i+1 == mids.__len__():
                         callback = functools.partial(self.on_post,

@@ -579,7 +579,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
         
         # Validate schema
-        res_refs =[]
+        res_refs = []
         for index in range(len(resources)):
             try:
                 item = resources[index]

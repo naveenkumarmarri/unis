@@ -145,7 +145,7 @@ JSON_SCHEMAS = {
 
 # Default settings that apply to almost all network resources
 # This is used to make writing `Resources` easier.
-default_resource_settings= {
+default_resource_settings = {
     "base_url": "", # For additional URL extension, e.g. /mynetwork/unis will make /ports like /mynetwork/unis/ports
     "handler_class": "periscope.handlers.NetworkResourceHandler", # The HTTP Request Handler class
     "is_capped_collection": False,
