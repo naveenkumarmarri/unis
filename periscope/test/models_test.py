@@ -3,6 +3,9 @@
 Models related tests
 """
 
+__author__ = 'Ahmed El-Hassany <a.hassany@gmail.com>'
+__license__ = 'http://www.apache.org/licenses/LICENSE-2.0'
+
 import copy
 from mock import MagicMock
 from periscope.models import ObjectDict
@@ -13,25 +16,30 @@ from periscope.test.base import PeriscopeTestCase
 
 class ObjectDictTest(PeriscopeTestCase):
     def test_init(self):
+
         # Arrange
         test_data = {"key1": "value1", "key2": "value2", "$key3": "value3"}
+
         # Act
         obj1 = ObjectDict()
         obj2 = ObjectDict(test_data)
+
         # Assert
         self.assertEqual(obj1, {})
         self.assertEqual(obj2, test_data)
         for key, value in test_data.items():
             self.assertTrue(hasattr(obj2, key))
             self.assertEqual(getattr(obj2, key), value)
-        
+
     def test_add_property(self):
         # Arrange
         test_data = {"key1": "value1", "key2": "value2", "$key3": "value3"}
         obj = ObjectDict(test_data)
+
         # Act
         obj.key4 = "value4"
         obj["key5"] = "value5"
+
         # Assert
         self.assertTrue(hasattr(obj, "key4"))
         self.assertEqual(getattr(obj, "key4"), "value4")
@@ -41,7 +49,7 @@ class ObjectDictTest(PeriscopeTestCase):
         for key, value in test_data.items():
             self.assertTrue(hasattr(obj, key))
             self.assertEqual(getattr(obj, key), value)
-    
+
     def test_del_property(self):
         # Arrange
         test_data = {"key1": "value1", "key2": "value2", "$key3": "value3"}
@@ -57,13 +65,14 @@ class ObjectDictTest(PeriscopeTestCase):
         self.assertFalse("key2" in obj)
         self.assertTrue(hasattr(obj, "$key3"))
         self.assertEqual(getattr(obj, "$key3"), "value3")
-    
+
     def test_convert_value(self):
         # Arrange
         test_data = {"key1": "value1",
-            "key2": {"k1": "v1"},
-            "key3": {"k2": {"k3": "v3"}}}
+                     "key2": {"k1": "v1"},
+                     "key3": {"k2": {"k3": "v3"}}}
         obj = ObjectDict(test_data)
+
         # Act
         key1 = obj.key1
         key2 = obj["key2"]
@@ -71,6 +80,7 @@ class ObjectDictTest(PeriscopeTestCase):
         k1 = key2.k1
         k2 = key3["k2"]
         k3 = k2.k3
+
         # Assert
         self.assertEqual(obj, test_data)
         self.assertTrue(isinstance(obj, ObjectDict))
@@ -80,23 +90,21 @@ class ObjectDictTest(PeriscopeTestCase):
         self.assertTrue(isinstance(k1, str))
         self.assertTrue(isinstance(k2, ObjectDict))
         self.assertTrue(isinstance(k3, str))
-        
+
     def test_convert_value_nested(self):
         # Arrange
         test_data = {"key1": "value1",
-            "key2": {"k1": "v1"},
-            "key3": {"k2": {"k3": "v3"}},
-            "key4": [{"k4": {"k5": "v5"}}]
-        }
+                     "key2": {"k1": "v1"},
+                     "key3": {"k2": {"k3": "v3"}},
+                     "key4": [{"k4": {"k5": "v5"}}]}
         expected_data = {"key1": "value1",
-            "key2": {"k1": "v1"},
-            "key3": {"k2": {"k3": "v3"}},
-            "key4": [{"k4": {"k5": "v5"}}, {"k6": "v6"}],
-            "key5": {"k7": [{"k8": "v8"}, {"k9": "v9"}]}
-        }
+                         "key2": {"k1": "v1"},
+                         "key3": {"k2": {"k3": "v3"}},
+                         "key4": [{"k4": {"k5": "v5"}}, {"k6": "v6"}],
+                         "key5": {"k7": [{"k8": "v8"}, {"k9": "v9"}]}}
         obj = ObjectDict(test_data)
+
         # Act
-        
         key1 = obj.key1
         key2 = obj["key2"]
         key3 = obj.key3
@@ -109,6 +117,7 @@ class ObjectDictTest(PeriscopeTestCase):
         obj.key5 = {"k7": [{"k8": "v8"}]}
         k7 = obj.key5.k7
         k7.append({"k9": "v9"})
+
         # Assert
         self.assertEqual(obj, expected_data)
         self.assertTrue(isinstance(obj, ObjectDict))
@@ -119,7 +128,6 @@ class ObjectDictTest(PeriscopeTestCase):
         self.assertTrue(isinstance(k2, ObjectDict))
         self.assertTrue(isinstance(k3, str))
 
-        
     def test_to_mongo(self):
         # Arrange
         obj = ObjectDict()
@@ -130,12 +138,12 @@ class ObjectDictTest(PeriscopeTestCase):
         obj["prop5"] = [{"key.1": "v1", "$key2": "v2"}]
         expected = {
             "\$prop1": "value1",
-            "prop$DOT$2": "value2", 
-            "prop$DOT$$3": "value3", 
+            "prop$DOT$2": "value2",
+            "prop$DOT$$3": "value3",
             "prop4": {
                 "\$prop1": "value1",
-                "prop$DOT$2": "value2", 
-                "prop$DOT$$3": "value3", 
+                "prop$DOT$2": "value2",
+                "prop$DOT$$3": "value3",
             },
             "prop5": [
                 {
@@ -146,7 +154,8 @@ class ObjectDictTest(PeriscopeTestCase):
         }
 
         # Act
-        mongo_dict = dict(obj._to_mongoiter())
+        mongo_dict = dict(obj.to_mongoiter())
+
         # Assert
         self.assertTrue(hasattr(obj, "$prop1"))
         self.assertTrue(hasattr(obj, "prop.2"))
@@ -155,17 +164,17 @@ class ObjectDictTest(PeriscopeTestCase):
         self.assertEqual(obj["prop.2"], "value2")
         self.assertEqual(obj["prop.$3"], "value3")
         self.assertEqual(mongo_dict, expected)
-        
+
     def test_from_mongo(self):
         # Arrange
         data = {
             "\$prop1": "value1",
-            "prop$DOT$2": "value2", 
-            "prop$DOT$$3": "value3", 
+            "prop$DOT$2": "value2",
+            "prop$DOT$$3": "value3",
             "prop4": {
                 "\$prop1": "value1",
-                "prop$DOT$2": "value2", 
-                "prop$DOT$$3": "value3", 
+                "prop$DOT$2": "value2",
+                "prop$DOT$$3": "value3",
             },
             "prop5": [
                 {
@@ -174,9 +183,10 @@ class ObjectDictTest(PeriscopeTestCase):
                 }
             ]
         }
-        
+
         # Act
-        obj = ObjectDict._from_mongo(data)
+        obj = ObjectDict.from_mongo(data)
+
         # Assert
         self.assertTrue(isinstance(obj, ObjectDict))
         self.assertTrue(hasattr(obj, "$prop1"))
@@ -187,7 +197,8 @@ class ObjectDictTest(PeriscopeTestCase):
         self.assertEqual(obj["$prop1"], "value1")
         self.assertEqual(obj["prop.2"], "value2")
         self.assertEqual(obj["prop.$3"], "value3")
-        self.assertEqual(obj["prop4"],  \
+        self.assertEqual(
+            obj["prop4"],
             {"$prop1": "value1", "prop.2": "value2", "prop.$3": "value3"})
         self.assertEqual(obj["prop5"], [{"key.1": "v1", "$key2": "v2"}])
 
@@ -195,7 +206,8 @@ class ObjectDictTest(PeriscopeTestCase):
 class JSONSchemaModelTest(PeriscopeTestCase):
     def test_init(self):
         # Arrange
-        schema = {"name": "TestSchema",
+        schema = {
+            "name": "TestSchema",
             "description": "Unit testing schema",
             "additionalProperties": False,
             "properties": {
@@ -222,10 +234,11 @@ class JSONSchemaModelTest(PeriscopeTestCase):
         self.assertEqual(schemaModel.__doc__, schema["description"])
         self.assertTrue(hasattr(schemaModel, "prop1"))
         self.assertTrue(hasattr(schemaModel, "prop2"))
-        
+
     def test_set_value(self):
         # Arrange
-        schema = {"name": "TestSchema",
+        schema = {
+            "name": "TestSchema",
             "description": "Unit testing schema",
             "properties": {
                 "prop1": {
@@ -264,11 +277,11 @@ class JSONSchemaModelTest(PeriscopeTestCase):
         self.assertEqual(schemaModel["prop2"], "value2")
         self.assertEqual(schemaModel["prop3"], "value3")
         self.assertEqual(schemaModel["prop4"], "value4")
-        
-    
+
     def test_json_model_factory(self):
         # Arrange
-        schema = {"name": "TestSchema",
+        schema = {
+            "name": "TestSchema",
             "description": "Unit testing schema",
             "properties": {
                 "prop1": {
@@ -287,7 +300,8 @@ class JSONSchemaModelTest(PeriscopeTestCase):
                 },
             },
         }
-        schema2 = {"name": "TestSchema2",
+        schema2 = {
+            "name": "TestSchema2",
             "description": "Unit testing schema2",
             "properties": {
                 "p1": {
@@ -296,22 +310,24 @@ class JSONSchemaModelTest(PeriscopeTestCase):
                 }
             }
         }
-        
+
         # Act
         Schema = JSONSchemaModel.json_model_factory("Schema", schema)
         Schema2 = JSONSchemaModel.json_model_factory("Schema2", schema2,
-            extends=Schema)
+                                                     extends=Schema)
         schemaModel = Schema()
         schemaModel.prop1 = "value1"
         schemaModel["prop2"] = "value2"
         schemaModel.prop3 = "value3"
         schemaModel["prop4"] = "value4"
         schemaModel2 = Schema2()
+
         # Assert
         self.assertTrue(hasattr(schemaModel, "prop1"))
         self.assertTrue(hasattr(schemaModel, "prop2"))
         self.assertTrue(hasattr(schemaModel, "prop3"))
         self.assertTrue(hasattr(schemaModel, "prop4"))
+        self.assertTrue(hasattr(schemaModel2, "p1"))
         self.assertEqual(schemaModel.prop1, "value1")
         self.assertEqual(schemaModel.prop2, "value2")
         self.assertEqual(schemaModel.prop3, "value3")
@@ -320,10 +336,11 @@ class JSONSchemaModelTest(PeriscopeTestCase):
         self.assertEqual(schemaModel["prop2"], "value2")
         self.assertEqual(schemaModel["prop3"], "value3")
         self.assertEqual(schemaModel["prop4"], "value4")
-    
+
     def test_nested_schemas(self):
         # Arrange
-        schema = {"name": "TestSchema",
+        schema = {
+            "name": "TestSchema",
             "description": "Unit testing schema",
             "properties": {
                 "prop1": {
@@ -336,7 +353,8 @@ class JSONSchemaModelTest(PeriscopeTestCase):
                 },
             }
         }
-        schema2 = {"name": "TestSchema2",
+        schema2 = {
+            "name": "TestSchema2",
             "description": "Unit testing schema2",
             "properties": {
                 "p1": {
@@ -353,13 +371,14 @@ class JSONSchemaModelTest(PeriscopeTestCase):
         }
         Schema = JSONSchemaModel.json_model_factory("Schema", schema)
         Schema2 = JSONSchemaModel.json_model_factory("Schema2", schema2,
-            extends=Schema)
+                                                     extends=Schema)
         loader_mock = SchemasLoader()
         loader_mock.get_class = MagicMock()
         loader_mock.get_class.return_value = Schema2
-        
+
         # Act
         schemaModel = Schema(data, schemas_loader=loader_mock)
+
         # Assert
         self.assertTrue(hasattr(schemaModel, "prop1"))
         self.assertTrue(hasattr(schemaModel, "prop2"))
@@ -368,7 +387,6 @@ class JSONSchemaModelTest(PeriscopeTestCase):
         self.assertEqual(schemaModel["prop1"], data["prop1"])
         self.assertEqual(schemaModel["prop2"], data["prop2"])
         self.assertEqual(type(schemaModel.prop2), Schema2)
-
 
 
 class SchemasLoaderTest(PeriscopeTestCase):
@@ -402,4 +420,3 @@ class SchemasLoaderTest(PeriscopeTestCase):
         # Assert
         self.assertTrue(isinstance(obj, SchemasLoader))
         self.assertEqual(schema_get, schema)
-

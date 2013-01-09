@@ -9,13 +9,13 @@ __license__ = 'http://www.apache.org/licenses/LICENSE-2.0'
 import time
 from periscope.db import object_id
 from periscope.models import JSONSchemaModel
-from periscope.models import schemaLoader
-from periscope.models import schemaMetaFactory
+from periscope.models import SCHEMA_LOADER
+from periscope.models import schema_meta_factory
 from periscope.settings import SCHEMAS
 
 
-METADATA_SCHEMA = schemaLoader.get(SCHEMAS["metadata"])
-METADATA_META = schemaMetaFactory("MetadataMeta",
+METADATA_SCHEMA = SCHEMA_LOADER.get(SCHEMAS["metadata"])
+METADATA_META = schema_meta_factory("MetadataMeta",
                                   schema=METADATA_SCHEMA)
 
 class Metadata(JSONSchemaModel):
