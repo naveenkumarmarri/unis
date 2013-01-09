@@ -20,7 +20,7 @@ from periscope.handlers import CollectionHandler
 from periscope.handlers import MainHandler
 from periscope.handlers import MIME
 from periscope.handlers import SCHEMAS
-from periscope.db import DBLayer
+from periscope.db import DBLayerFactory
 from periscope.utils import load_class
 
 # default port
@@ -56,7 +56,7 @@ class PeriscopeApplication(tornado.web.Application):
                 unique=True)            
         
         # Prepare the DBLayer
-        db_layer = DBLayer(self.async_db,
+        db_layer = DBLayerFactory.new_dblayer(self.async_db,
             collection_name,
             is_capped_collection,
             id_field_name,
