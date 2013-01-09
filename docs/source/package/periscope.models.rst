@@ -1,5 +1,5 @@
-``periscope.models`` --- UNIS Network Resources Models
-======================================================
+models Package
+==============
 
 :mod:`models` Package
 ---------------------
@@ -24,3 +24,4 @@
     :members:
     :undoc-members:
     :show-inheritance:
+

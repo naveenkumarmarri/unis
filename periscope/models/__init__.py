@@ -28,6 +28,7 @@ more powerful method is using metaclasses.
                                      set_defaults=set_defaults,
                                      schemas_loader=schemas_loader)
             # Then we can do whatever to customize the model
+
 """
 
 __author__ = 'Ahmed El-Hassany <a.hassany@gmail.com>'
@@ -55,7 +56,8 @@ class ObjectDict(dict):
       - `data`: initial data in the dict.
       - `_set_attributes`: True
       - `schemas_loader`: The schema loader class to load the inner data.
-      See :class:`periscope.models.SchemasLoader`.
+
+    See :class:`periscope.models.SchemasLoader`.
     """
 
     __special_properties_names__ = [
@@ -266,7 +268,8 @@ class JSONSchemaModel(ObjectDict):
       - `schema`: dict of the JSON schema to create the class based on.
       - `data`: initial data
       - `set_defaults (optional)`: if a property has default value on the
-      schema then set the value of the attribute to it.
+        schema then set the value of the attribute to it.
+
     """
 
     def __init__(self, data=None, set_defaults=True, schemas_loader=None):

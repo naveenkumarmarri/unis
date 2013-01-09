@@ -41,30 +41,23 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         """
         Initializes handler for certain type of network resources.
 
-        Parameters:
-        
-        collection_name: name of the database collection name that
-                        stores information about the network resource.
-        
-        base_url: the base the path to access this resource, e.g., /nodes
-        
-        schemas_single: a dictionary that represents the network
-                        resources schema to be validated againest.
-                        The dictionary is indexed by content-type.
-        
-        schemas_list: a dictionary that represents the listing of this
-                        resources schema to be validated againest.
-        
-        allow_get: User client can issue HTTP GET requests to this resource
-        
-        allow_post: User client can issue HTTP POST requests to this resource
-        
-        allow_put: User client can issue HTTP PUT requests to this resource
-        
-        allow_delete: User client can issue HTTP DELETE requests to this
-                        resource.
-        
-        tailable: The underlying database collection is a capped collection.
+        :Parameters:
+
+          - `collection_name`: name of the database collection name that
+            stores information about the network resource.
+          - `base_url`: the base the path to access this resource, e.g., /nodes
+          - `schemas_single`: a dictionary that represents the network
+            resources schema to be validated againest.
+            The dictionary is indexed by content-type.
+          - `schemas_list`: a dictionary that represents the listing of this
+            resources schema to be validated againest.
+          - `allow_get`: User client can issue HTTP GET requests to this resource
+          - `allow_post`: User client can issue HTTP POST requests to this resource
+          - `allow_put`: User client can issue HTTP PUT requests to this resource
+          - `allow_delete`: User client can issue HTTP DELETE requests to this
+            resource.
+          - `tailable`: The underlying database collection is a capped collection.
+
         """
         # TODO (AH): Add ability to Enable/Disable different HTTP methods
         #if not isinstance(dblayer, DBLayer):
@@ -357,11 +350,11 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     def _find(self, query, callback, fields=None, limit=None):
         """Query the database.
 
-        Parameters:
+        :Parameters:
+          - `callback`: a function to be called back in case of new data.
+            callback function should have `response`, `error`,
+            and `new` fields. `new` is going to be True.
 
-        callback: a function to be called back in case of new data.
-                callback function should have `response`, `error`,
-                and `new` fields. `new` is going to be True.
         """
         keep_alive = self.supports_streaming or self.supports_sse()
         if self._res_id:
@@ -384,12 +377,12 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     def _get_more(self, cursor, callback):
         """Calls the given callback if there is data available on the cursor.
 
-        Parameters:
-
-        cursor: database cursor returned from a find operation.
-        callback: a function to be called back in case of new data.
+        :Parameters:
+          - `cursor`: database cursor returned from a find operation.
+          - `callback`: a function to be called back in case of new data.
             callback function should have `response`, `error`,
             and `new` fields. `new` is going to be False.
+
         """
         # If the client went away,
         # clean up the  cursor and close the connection
@@ -415,12 +408,13 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
                         is_list=False, query=None, last_batch=False):
         """callback for get request
 
-        Parameters:
-            response: the response body from the database
-            error: any error messages from the database.
-            new: True if this is the first time to call this method.
-            is_list: If True listing is requered, for example /nodes,
-                    otherwise it's a single object like /nodes/node_id
+        :Parameters:
+          - `response`: the response body from the database
+          - `error: any error messages from the database.
+          - `new: True if this is the first time to call this method.
+          - `is_list: If True listing is requered, for example /nodes,
+            otherwise it's a single object like /nodes/node_id
+
         """
         if error:
             self.send_error(500, message=error)

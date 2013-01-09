@@ -32,11 +32,12 @@ class NetworkResource(JSONSchemaModel):
 
       - `data`: the initial data dict to load the `NetworkResource`
       - `set_defaults`: If true use the default values from the UNIS schema
-      to set the values of the properties that were not definied in `data`.
+        to set the values of the properties that were not definied in `data`.
       - `schema_loads`: the object used to load schema of the inner objects.
       - `auto_id`: If true, `id` will be generated if not provided in `data`.
       - `auto_ts`: If true, `ts` the current time will be used
         if not provided in `data`.
+
     """
 
     __metaclass__ = NETWORK_RESOURCE_META
@@ -57,10 +58,11 @@ class NetworkResource(JSONSchemaModel):
         Creates network resource(s) from the input json dict.
 
         :Parameters:
-          - `data`: the input data dict or list of dicts
+          - `data`: the input data dict or list of dicts.
 
         See :class:`periscope.models.unis.NetworkResource` for the rest
         of arguments.
+
         """
         # It's easier to deal with lists
         is_list = isinstance(data, list)

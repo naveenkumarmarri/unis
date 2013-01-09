@@ -14,7 +14,7 @@ Contents:
    periscope_intro
    schema/unis_model
    rest/index
-   
+   package/periscope
 
 
 Indices and tables

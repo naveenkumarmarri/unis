@@ -372,14 +372,15 @@ class AbstractDBLayer(object, nllog.DoesLogging):
     the database calls for any future improvements or updates.
 
     :Parameters:
-    - `client`: the database driver client or connection. The connection is
+      - `client`: the database driver client or connection. The connection is
         assumed to be established.
-    - `collection_name`: the name of the database collection that this layer
+      - `collection_name`: the name of the database collection that this layer
         will talk to.
-    - `capped`: True if the collection is capped collection. See MongoDB capped
+      - `capped`: True if the collection is capped collection. See MongoDB capped
         collections.
-    - `id_field`: The name of the identifier field
-    - `timestamp_field`: The name of the timestamp field
+      - `id_field`: The name of the identifier field
+      - `timestamp_field`: The name of the timestamp field
+
     """
     __metaclass__ = abc.ABCMeta
 
@@ -404,8 +405,9 @@ class AbstractDBLayer(object, nllog.DoesLogging):
         """Find one or more documents in the collection.
 
         :Parameters:
-        - `query`: the database query.
-        - `kwargs`: see mongodb find query argumenets
+          - `query`: the database query.
+          - `kwargs`: see mongodb find query argumenets
+
         """
         pass
 
