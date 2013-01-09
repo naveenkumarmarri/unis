@@ -19,7 +19,9 @@ version = "0.1.dev"
 setup(
     name="periscope",
     version=version,
-    packages=["periscope", "periscope.handlers", "periscope.test"],
+    packages=[
+        "periscope", "periscope.handlers", "periscope.models", "periscope.test"
+    ],
     package_data={},
     author="Ahmed El-Hassany",
     author_email="ahassany@indiana.edu",
@@ -36,7 +38,7 @@ setup(
         "unittest2",
         "netlogger>=4.3.0",
         "validictory>=validictory-0.8.1",
-        "mock==0.8.0",
+        "mock",
         "jsonpointer==0.2",
         "argparse",
         "httplib2",
