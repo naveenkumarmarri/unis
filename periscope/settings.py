@@ -136,6 +136,12 @@ SCHEMAS = {
     'datum' : 'http://unis.incntre.iu.edu/schema/20120709/datum#',
 }
 
+JSON_SCHEMAS = {
+    'schema': 'http://json-schema.org/draft-03/schema#',    
+    'hyper': 'http://json-schema.org/draft-03/hyper-schema#',
+    'links': 'http://json-schema.org/draft-03/links#',
+    'ref': 'http://json-schema.org/draft-03/json-ref#',
+}
 
 # Default settings that apply to almost all network resources
 # This is used to make writing `Resources` easier.
