@@ -13,19 +13,7 @@ MIME = {
     'PSXML': 'application/perfsonar+xml',
 }
 
-SCHEMAS = {
-    'networkresource': 'http://unis.incntre.iu.edu/schema/20120709/networkresource#',
-    'node': 'http://unis.incntre.iu.edu/schema/20120709/node#',
-    'domain': 'http://unis.incntre.iu.edu/schema/20120709/domain#',
-    'port': 'http://unis.incntre.iu.edu/schema/20120709/port#',
-    'link': 'http://unis.incntre.iu.edu/schema/20120709/link#',
-    'path': 'http://unis.incntre.iu.edu/schema/20120709/path#',
-    'network': 'http://unis.incntre.iu.edu/schema/20120709/network#',
-    'topology': 'http://unis.incntre.iu.edu/schema/20120709/topology#',
-    'blipp': 'http://unis.incntre.iu.edu/schema/20120709/blipp#',
-    'metadata': 'http://unis.incntre.iu.edu/schema/20120709/metadata#',
-    'service' : "http://unis.incntre.iu.edu/schema/20120709/service#"
-}
+
 
 
 # TODO (AH): cache common schemas locally
@@ -42,43 +30,18 @@ CACHE = {
 }
 
 
-
 import copy
 import json
-import re
 import functools
-import jsonpointer
-from jsonpath import jsonpath
-from netlogger import nllog
 import time
-import urllib2
-import traceback
-from tornado.ioloop import IOLoop
-import tornado.gen as gen
+
 import tornado.web
 from tornado.httpclient import HTTPError
 from tornado.httpclient import AsyncHTTPClient
-import pymongo
-if pymongo.version_tuple[1] > 1:
-    from bson.objectid import ObjectId
-else:
-    from pymongo.objectid import ObjectId
 
-from urllib import urlencode
-
-from periscope.db import DBLayer
 from periscope.db import dumps_mongo
-from periscope.models import ObjectDict
-from periscope.models import NetworkResource
-from periscope.models import HyperLink
-from periscope.models import Topology
-from periscope.models import schemaLoader
-from periscope.models import JSONSchemaModel
-import periscope.utils as utils
+from periscope.models.unis import NetworkResource
 from asyncmongo.errors import IntegrityError, TooManyConnections
-
-
-from periscope.handlers.sse_handler import SSEHandler
 from periscope.handlers.networkresource_handler import NetworkResourceHandler
 from periscope.handlers.collection_handler import CollectionHandler
 

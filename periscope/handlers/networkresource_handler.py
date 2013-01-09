@@ -7,37 +7,19 @@ import copy
 import json
 import re
 import functools
-import jsonpointer
-from jsonpath import jsonpath
 from netlogger import nllog
 import time
-import urllib2
 import traceback
 from tornado.ioloop import IOLoop
+import tornado.gen as gen
 import tornado.web
 from tornado.httpclient import HTTPError
-from tornado.httpclient import AsyncHTTPClient
-import pymongo
-if pymongo.version_tuple[1] > 1:
-    from bson.objectid import ObjectId
-else:
-    from pymongo.objectid import ObjectId
-
-from urllib import urlencode
-
+from pymongo.errors import DuplicateKeyError
 from periscope.handlers.sse_handler import SSEHandler
-from periscope.db import DBLayer
 from periscope.db import dumps_mongo
 from periscope.models import ObjectDict
-from periscope.models import NetworkResource
-from periscope.models import HyperLink
-from periscope.models import Topology
-from periscope.models import schemaLoader
-from periscope.models import JSONSchemaModel
-import periscope.utils as utils
-from asyncmongo.errors import IntegrityError, TooManyConnections
-
-from periscope.handlers import MIME, SCHEMAS
+from periscope.models.unis import NetworkResource
+from periscope.handlers import MIME
 
 class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     """Generic Network resources handler"""
@@ -384,7 +366,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         keep_alive = self.supports_streaming or self.supports_sse()
         if self._res_id:
             query[self.Id] = self._res_id
-        options = dict(query=query, callback=callback)#, await_data=True)
+        options = dict(query=query)#, await_data=True)
         # Makes it a tailable cursor
         if keep_alive and self._tailable:
             options.update(dict(tailable=True, timeout=False))
@@ -397,6 +379,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         options["sort"].append(("ts", -1))
         self._query = query
         self._cursor = self.dblayer.find(**options)
+        self._cursor.to_list(callback=callback)
 
     def _get_more(self, cursor, callback):
         """Calls the given callback if there is data available on the cursor.
@@ -415,7 +398,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.finish()
             return
         # If the cursor is not alive, issue new find to the database
-        if cursor and cursor.alive:
+        if cursor and cursor.native_cursor.alive:
             cursor.get_more(callback)
         else:
             callback.keywords["response"] = []
@@ -569,6 +552,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
         return
 
+    @gen.engine
     def post_psjson(self):
         """
         Handles HTTP POST request with Content Type of PSJSON.
@@ -591,7 +575,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             else:
                 resources = [self._model_class(body)] 
         except Exception as exp:
-            self.send_error(400, message="malformatted request " + str(exp))
+            self.send_error(400, message="Clound't deserialize objects from the request: " + str(exp))
             return
         
         # Validate schema
@@ -612,36 +596,147 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
                 res_ref[self.Id] = item[self.Id]
                 res_ref[self.timestamp] = item[self.timestamp]
                 res_refs.append(res_ref)
-                resources[index] = dict(item._to_mongoiter())
+                resources[index] = dict(item.to_mongoiter())
             except Exception as exp:
-                self.send_error(400, message="Not valid body '%s'." % exp)
+                self.send_error(400, message="Not valid body: %s." % exp)
                 return
         
         callback = functools.partial(self.on_post,
                     res_refs=res_refs, return_resources=True)
-        self.dblayer.insert(resources, callback=callback)
+        #self.dblayer.insert(resources, callback=callback)
+                
+        insert_ret = yield gen.Task(self.dblayer.insert, resources)
+        print "Insert ret", insert_ret
+        result, error = insert_ret[0]
+        res_ids = ["%s:%s" % (i['id'], i['ts']) for i in res_refs]
+        if error:
+            # First try removing inserted items (if any_
+            items_removed = True
+            remove_error_msg = ""
+            try:
+                self.dblayer.remove({"_id" : {"$in":  res_ids}}, callback=(yield gen.Callback("remove_op")))
+                response = yield gen.Wait("remove_op")
+            except Exception as exp:
+                items_remove = False
+                remove_error_msg += str(exp)
+            
+            # Prepare the right error code
+            if isinstance(error, DuplicateKeyError):
+                code = 409
+            else:
+                code = 500
+            message="Could't process the POST request: %s." % \
+                        str(error).replace("\"", "\\\"")
+            
+            # Check if the inserted items where removed correctly
+            if items_removed is False:
+                message += " Transaction couldn't be rolled back:", remove_error_msg
+            else:
+                message += " Transaction IS rolled back successfully."
+            self.send_error(code, message=message)
+            return
+        return_resources = True 
+        if return_resources:
+            query = {"$or": []}
+            for res_ref in res_refs:
+                query["$or"].append(res_ref)
+            #self.dblayer.find(query, self._return_resources)
+            cursor = self.dblayer.find(query)
+            
+            unescaped = []
+            accept = self.accept_content_type
+            self.set_header("Content-Type", accept + \
+                " ;profile="+ self.schemas_single[accept])
+            self.set_status(201)
+        
+            while (yield cursor.fetch_next):
+                res = cursor.next_object()
+                unescaped.append(ObjectDict.from_mongo(res))
+            
+            if len(unescaped) == 1:
+                location = self.request.full_url()
+                if not location.endswith(unescaped[0][self.Id]):
+                    location = location + "/" + unescaped[0][self.Id]
+                self.set_header("Location", location)
+                self.write(dumps_mongo(unescaped[0], indent=2))
+            else:
+                self.write(dumps_mongo(unescaped, indent=2))
+                
+            self.finish()
+            return
+        else:
+            accept = self.accept_content_type
+            self.set_header("Content-Type", accept + \
+                " ;profile="+ self.schemas_single[accept])
+            if len(res_refs) == 1:
+                self.set_header("Location",
+                    "%s/%s" % (self.request.full_url(), res_refs[0][self.Id]))
+            self.set_status(201)
+            self.finish()
+            
 
+    @gen.engine
     def on_post(self, request, error=None, res_refs=None, return_resources=True):
         """
         HTTP POST callback to send the results to the client.
         """
-        
+        res_ids = ["%s:%s" % (i['id'], i['ts']) for i in res_refs]
         if error:
-            if isinstance(error, IntegrityError):
-                self.send_error(409,
-                    message="Could't process the POST request '%s'" % \
-                        str(error).replace("\"", "\\\""))
+            # First try removing inserted items (if any_
+            items_removed = True
+            remove_error_msg = ""
+            try:
+                self.dblayer.remove({"_id" : {"$in":  res_ids}}, callback=(yield gen.Callback("remove_op")))
+                response = yield gen.Wait("remove_op")
+            except Exception as exp:
+                items_remove = False
+                remove_error_msg += str(exp)
+            
+            # Prepare the right error code
+            if isinstance(error, DuplicateKeyError):
+                code = 409
             else:
-                self.send_error(500,
-                    message="Could't process the POST request '%s'" % \
-                        str(error).replace("\"", "\\\""))
+                code = 500
+            message="Could't process the POST request: %s." % \
+                        str(error).replace("\"", "\\\"")
+            
+            # Check if the inserted items where removed correctly
+            if items_removed is False:
+                message += " Transaction couldn't be rolled back:", remove_error_msg
+            else:
+                message += " Transaction IS rolled back successfully."
+            self.send_error(code, message=message)
             return
+        
         
         if return_resources:
             query = {"$or": []}
             for res_ref in res_refs:
                 query["$or"].append(res_ref)
-            self.dblayer.find(query, self._return_resources)
+            #self.dblayer.find(query, self._return_resources)
+            cursor = self.dblayer.find(query)
+            
+            unescaped = []
+            accept = self.accept_content_type
+            self.set_header("Content-Type", accept + \
+                " ;profile="+ self.schemas_single[accept])
+            self.set_status(201)
+        
+            while (yield cursor.fetch_next):
+                res = cursor.next_object()
+                unescaped.append(ObjectDict.from_mongo(res))
+            
+            if len(unescaped) == 1:
+                location = self.request.full_url()
+                if not location.endswith(unescaped[0][self.Id]):
+                    location = location + "/" + unescaped[0][self.Id]
+                self.set_header("Location", location)
+                self.write(dumps_mongo(unescaped[0], indent=2))
+            else:
+                self.write(dumps_mongo(unescaped, indent=2))
+                
+            self.finish()
+            return
         else:
             accept = self.accept_content_type
             self.set_header("Content-Type", accept + \
@@ -660,7 +755,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         self.set_status(201)
         try:
             for res in request:
-                unescaped.append(ObjectDict._from_mongo(res))
+                unescaped.append(ObjectDict.from_mongo(res))
             
             if len(unescaped) == 1:
                 location = self.request.full_url()
@@ -739,7 +834,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         res_ref[self.timestamp] = resource[self.timestamp]
         callback = functools.partial(self.on_put, res_ref=res_ref, 
             return_resource=True)
-        self.dblayer.insert(dict(resource._to_mongoiter()), callback=callback)
+        self.dblayer.insert(dict(resource.to_mongoiter()), callback=callback)
 
     def on_put(self, response, error=None, res_ref=None, return_resource=True):
         """

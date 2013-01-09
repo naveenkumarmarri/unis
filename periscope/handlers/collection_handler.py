@@ -19,28 +19,22 @@ import tornado.web
 from tornado.httpclient import HTTPError
 from tornado.httpclient import AsyncHTTPClient
 import pymongo
-if pymongo.version_tuple[1] > 1:
-    from bson.objectid import ObjectId
-else:
-    from pymongo.objectid import ObjectId
 
 from urllib import urlencode
 
 from periscope.handlers.sse_handler import SSEHandler
-from periscope.db import DBLayer
 from periscope.db import dumps_mongo
 from periscope.models import ObjectDict
-from periscope.models import NetworkResource
+from periscope.models.unis import NetworkResource
 from periscope.models import HyperLink
-from periscope.models import Topology
-from periscope.models import schemaLoader
+from periscope.models.unis import Topology
+from periscope.models import SCHEMA_LOADER as schemaLoader
 from periscope.models import JSONSchemaModel
 import periscope.utils as utils
 from asyncmongo.errors import IntegrityError, TooManyConnections
 
 from periscope.handlers.networkresource_handler import NetworkResourceHandler
-from periscope.handlers import MIME, SCHEMAS
-
+from periscope.handlers import MIME
 
 class CollectionHandler(NetworkResourceHandler):
     def initialize(self, collections, *args, **kwargs):
@@ -91,7 +85,7 @@ class CollectionHandler(NetworkResourceHandler):
         except Exception as exp:
             self.send_error(400, message="malformatted json request '%s'." % exp)
             return
-        
+
         try:
             collections = []
             if isinstance(body, list):
@@ -173,7 +167,7 @@ class CollectionHandler(NetworkResourceHandler):
                 for index in range(len(collection[key])):
                     if 'selfRef' in collection[key][index]:
                         collection[key][index] = {"href": collection[key][index]["selfRef"], "rel": "full"}
-            coll_reps.append(dict(collection._to_mongoiter()))
+            coll_reps.append(dict(collection.to_mongoiter()))
         
         callback = functools.partial(self.on_post, res_refs=res_refs)
         self.dblayer.insert(coll_reps, callback=callback)

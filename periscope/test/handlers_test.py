@@ -9,22 +9,21 @@ from mock import patch
 from tornado.httpclient import HTTPError
 from tornado.httpserver import HTTPRequest
 import pymongo
-if pymongo.version_tuple[1] > 1:
-    from bson.objectid import ObjectId
-else:
-    from pymongo.objectid import ObjectId
+from bson.objectid import ObjectId
+from bson.json_util import  dumps as dumps_mongo
 
-from periscope.db import DBLayer
-from periscope.db import dumps_mongo
+from periscope.db import DBLayerFactory
+#from periscope.db import dumps_mongo
 from periscope.utils import load_class
 from periscope.handlers import CollectionHandler
 from periscope.handlers import NetworkResourceHandler
-from periscope.handlers import SSEHandler
-from periscope.models import Topology
-from periscope.models import Node
-from periscope.models import schemaLoader
+from periscope.handlers.sse_handler import SSEHandler
+from periscope.models.unis import Topology
+from periscope.models.unis import Node
+from periscope.models import SCHEMA_LOADER
 from periscope.test.base import PeriscopeHTTPTestCase
 
+from periscope.db import AsyncmongoDBLayer as DBLayer
 MIME = {
     'HTML': 'text/html',
     'JSON': 'application/json',
@@ -1114,7 +1113,7 @@ class NetworkResourceHandlerTest(PeriscopeHTTPTestCase):
         self.assertTrue(on_post_mock.called)
         self.assertEqual(len(on_post_mock.call_args), 2)
         self.assertEqual(on_post_mock.call_args[0][1], request_single)
-        self.assertEqual(on_post_mock.call_args[0][2], None)
+        self.assertEqual(on_post_mock.call_args[1]["error"], None)
 
 
 
