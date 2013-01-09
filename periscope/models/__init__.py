@@ -238,7 +238,12 @@ def schema_meta_factory(name, schema, extends=None):
             newtype = super(SchemaMetaClass, cls).__new__(cls, classname,
                                                           bases, class_dict)
             if "description" in schema:
-                setattr(newtype, '__doc__', schema["description"])
+                doc = getattr(newtype, '__doc__', None)
+                if doc is None:
+                    doc = schema["description"]
+                else:
+                    doc = "%s\n\n%s\n" % (schema["description"], doc)
+                setattr(newtype, '__doc__', doc)
             if 'properties' not in schema:
                 schema['properties'] = {}
             if schema.get("type", "object") == "object":

@@ -29,6 +29,7 @@ class NetworkResource(JSONSchemaModel):
     """Netowrk resource is the base of all objects in UNIS.
 
     :Parameters:
+
       - `data`: the initial data dict to load the `NetworkResource`
       - `set_defaults`: If true use the default values from the UNIS schema
       to set the values of the properties that were not definied in `data`.
