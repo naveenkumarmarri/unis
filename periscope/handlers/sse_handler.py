@@ -4,6 +4,7 @@ Periscope HTTP(s) Handlers.
 """
 
 import tornado.web
+from tornado.httpclient import HTTPError
 
 
 class SSEHandler(tornado.web.RequestHandler):
@@ -145,7 +146,7 @@ class SSEHandler(tornado.web.RequestHandler):
             if self.decide_content_type() == self.SSE_MIME:
                 self._supports_sse = True
                 self._last_event_id = self.request.headers.get("Last-Event-ID",
-                                            None)
+                                                               None)
                 self.set_header("Cache-Control", "no-cache")
                 self.set_header("Content-Type", self.SSE_MIME)
                 if self.DEFAULT_RETRY:
@@ -160,5 +161,5 @@ class SSEHandler(tornado.web.RequestHandler):
                 getattr(self, self.request.method.lower())(*args, **kwargs)
                 if self._auto_finish and not self._finished:
                     self.finish()
-        except Exception, e:
-            self._handle_request_exception(e)
+        except Exception, exp:
+            self._handle_request_exception(exp)
