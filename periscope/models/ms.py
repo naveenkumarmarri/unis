@@ -11,6 +11,7 @@ from periscope.db import object_id
 from periscope.models import JSONSchemaModel
 from periscope.models import SCHEMA_LOADER
 from periscope.models import schema_meta_factory
+from periscope.models.unis import NetworkResource
 from periscope.settings import SCHEMAS
 
 
@@ -42,3 +43,8 @@ class Metadata(JSONSchemaModel):
             self.id = self.id or str(object_id())
         if auto_ts is True:
             self.ts = self.ts or int(time.time() * 1000000)
+
+
+Event = SCHEMA_LOADER.get_class(SCHEMAS["datum"], extends=NetworkResource)
+Data = SCHEMA_LOADER.get_class(SCHEMAS["data"], extends=NetworkResource)
+
