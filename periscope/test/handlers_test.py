@@ -23,7 +23,7 @@ from periscope.models.unis import Node
 from periscope.models import SCHEMA_LOADER
 from periscope.test.base import PeriscopeHTTPTestCase
 
-from periscope.db import AsyncmongoDBLayer as DBLayer
+
 MIME = {
     'HTML': 'text/html',
     'JSON': 'application/json',
@@ -309,7 +309,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
         # Arrange
         self.sync_db[self.collection_name].create_index(
                             [("id", 1), ("ts", 1)], unique=True)
-        dblayer = DBLayer(self.async_db, self.collection_name, capped=True)
+        dblayer = DBLayerFactory.new_dblayer(self.async_db, self.collection_name, capped=True)
         node = self._create_node("node_test")
         content_type = MIME['PSJSON'] + '; profile=' + schemas['node']
         handler = ("/nodes$", NetworkResourceHandler,
@@ -330,6 +330,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
                                 "Connection": "close"})
         
         # Assert
+        print "Response", response.body
         self.assertEqual(response.code, 201)
         res_id = unicode(response.headers.get('Location', "").split('/')[-1])
         result = self.sync_db[self.collection_name].find_one({'id': res_id}, fields={"_id": 0})

@@ -16,10 +16,14 @@ import tornado.web
 from tornado.httpclient import HTTPError
 from pymongo.errors import DuplicateKeyError
 from periscope.handlers.sse_handler import SSEHandler
+from periscope.db import DBOp
 from periscope.db import dumps_mongo
 from periscope.models import ObjectDict
+from periscope.models import ObjectDict
 from periscope.models.unis import NetworkResource
+from periscope.models.unis import NotValidSchema
 from periscope.handlers import MIME
+
 
 class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     """Generic Network resources handler"""
@@ -546,180 +550,112 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
         return
 
+    def rollback(self, resources, callback):
+        removed = True
+        items_list = []
+        for item in resources:
+            items_list.append(
+                {
+                    self.Id: item[self.Id],
+                    self.timestamp: item[self.timestamp]
+                }
+            )
+        remove_query = {'$or': items_list}
+        self.dblayer.remove(remove_query, callback=callback)
+
     @gen.engine
     def post_psjson(self):
         """
         Handles HTTP POST request with Content Type of PSJSON.
         """
         profile = self._validate_psjson_profile()
-
+        
         if not profile:
             return
         try:
             body = json.loads(self.request.body)
-        except Exception as exp:
-            self.send_error(400, message="malformatted json request '%s'." % exp)
-            return
-        
+            if not isinstance(body, dict) and not isinstance(body, list):
+                raise ValueError("Body is not a dictionary nor a list")
+        except ValueError as exp:
+            self.send_error(400, code=400001,
+                            message="malformatted json request '%s'." % exp)
+
+        # Create objects from the body
+        base_url = self.request.full_url()
+        model_class = self._model_class
+
         try:
-            resources = []
-            if isinstance(body, list):
-                for item in body:
-                    resources.append(self._model_class(item))
-            else:
-                resources = [self._model_class(body)] 
+            resources = model_class.create_resources(body, base_url)
+            # Make sure it's a list
+            if not isinstance(resources, list):
+                resources = [resources]
+        except NotValidSchema as exp:
+            message = "Not valid '$schema' field: %s" % str(exp)
+            self.send_error(400, code=400002, message=message)
+            return
         except Exception as exp:
-            self.send_error(400, message="Clound't deserialize objects from the request: " + str(exp))
+            message = "Clound't deserialize objects from the request: '%s'" \
+                % str(exp)
+            self.send_error(400, code=400003, message=message)
             return
-        
-        # Validate schema
-        res_refs = []
-        for index in range(len(resources)):
-            try:
-                item = resources[index]
-                item["selfRef"] = "%s/%s" % \
-                    (self.request.full_url(), item[self.Id])
-                item["$schema"] = item.get("$schema", self.schemas_single[MIME['PSJSON']])
-                if item["$schema"] != self.schemas_single[self.accept_content_type]:
-                    self.send_error(400,
-                        message="Not valid body '%s'; expecting $schema: '%s'." % \
-                        (item["$schema"], self.schemas_single[self.accept_content_type]))
-                    return
-                item._validate()
-                res_ref = {}
-                res_ref[self.Id] = item[self.Id]
-                res_ref[self.timestamp] = item[self.timestamp]
-                res_refs.append(res_ref)
-                resources[index] = dict(item.to_mongoiter())
-            except Exception as exp:
-                self.send_error(400, message="Not valid body: %s." % exp)
-                return
-        
-        callback = functools.partial(self.on_post,
-                    res_refs=res_refs, return_resources=True)
-        #self.dblayer.insert(resources, callback=callback)
-                
-        insert_ret = yield gen.Task(self.dblayer.insert, resources)
-        print "Insert ret", insert_ret
-        result, error = insert_ret[0]
-        res_ids = ["%s:%s" % (i['id'], i['ts']) for i in res_refs]
-        if error:
-            # First try removing inserted items (if any_
-            items_removed = True
-            remove_error_msg = ""
-            try:
-                self.dblayer.remove({"_id" : {"$in":  res_ids}}, callback=(yield gen.Callback("remove_op")))
-                response = yield gen.Wait("remove_op")
-            except Exception as exp:
-                items_remove = False
-                remove_error_msg += str(exp)
-            
+
+        # Inserting resources to mongodb
+        insert_result, insert_error = yield DBOp(
+            self.dblayer.insert,
+            [dict(item.to_mongoiter()) for item in resources])
+
+        if insert_error is None:
+            # TODO (AH): PUBLISH
+            self.write_psjson(insert_result)
+        elif insert_error:
+            # First try removing inserted items.
+            _, remove_error = yield DBOp(self.rollback, resources)
+            insert_error = str(insert_error)
             # Prepare the right error code
-            if isinstance(error, DuplicateKeyError):
-                code = 409
+            if 'duplicate key' in insert_error:
+                status_code = 409
+                message = "Conflict: %s." % \
+                    str(insert_error).replace("\"", "\\\"")
             else:
-                code = 500
-            message="Could't process the POST request: %s." % \
-                        str(error).replace("\"", "\\\"")
-            
+                status_code = 500
+                message = "Could't process the POST request: %s." % \
+                    str(insert_error).replace("\"", "\\\"")
+
             # Check if the inserted items where removed correctly
-            if items_removed is False:
-                message += " Transaction couldn't be rolled back:", remove_error_msg
-            else:
+            if remove_error is None:
+                if status_code == 409:
+                    code = 409001
+                else:
+                    code = 500001
                 message += " Transaction IS rolled back successfully."
-            self.send_error(code, message=message)
-            return
-        return_resources = True 
-        if return_resources:
-            query = {"$or": []}
-            for res_ref in res_refs:
-                query["$or"].append(res_ref)
-            #self.dblayer.find(query, self._return_resources)
-            cursor = self.dblayer.find(query)
-            
-            unescaped = []
-            accept = self.accept_content_type
-            self.set_header("Content-Type", accept + \
-                " ;profile="+ self.schemas_single[accept])
-            self.set_status(201)
-        
-            while (yield cursor.fetch_next):
-                res = cursor.next_object()
-                unescaped.append(ObjectDict.from_mongo(res))
-            
-            if len(unescaped) == 1:
-                location = self.request.full_url()
-                if not location.endswith(unescaped[0][self.Id]):
-                    location = location + "/" + unescaped[0][self.Id]
-                self.set_header("Location", location)
-                self.write(dumps_mongo(unescaped[0], indent=2))
             else:
-                self.write(dumps_mongo(unescaped, indent=2))
-                
-            self.finish()
+                if status_code == 409:
+                    code = 409002
+                else:
+                    code = 500002
+                message += " Transaction couldn't be rolled back: %s" \
+                    % str(remove_error)
+            self.send_error(status_code, code=code, message=message)
             return
-        else:
-            accept = self.accept_content_type
-            self.set_header("Content-Type", accept + \
-                " ;profile="+ self.schemas_single[accept])
-            if len(res_refs) == 1:
-                self.set_header("Location",
-                    "%s/%s" % (self.request.full_url(), res_refs[0][self.Id]))
-            self.set_status(201)
-            self.finish()
-            
 
     @gen.engine
-    def on_post(self, request, error=None, res_refs=None, return_resources=True):
-        """
-        HTTP POST callback to send the results to the client.
-        """
-        res_ids = ["%s:%s" % (i['id'], i['ts']) for i in res_refs]
-        if error:
-            # First try removing inserted items (if any_
-            items_removed = True
-            remove_error_msg = ""
-            try:
-                self.dblayer.remove({"_id" : {"$in":  res_ids}}, callback=(yield gen.Callback("remove_op")))
-                response = yield gen.Wait("remove_op")
-            except Exception as exp:
-                items_remove = False
-                remove_error_msg += str(exp)
-            
-            # Prepare the right error code
-            if isinstance(error, DuplicateKeyError):
-                code = 409
-            else:
-                code = 500
-            message="Could't process the POST request: %s." % \
-                        str(error).replace("\"", "\\\"")
-            
-            # Check if the inserted items where removed correctly
-            if items_removed is False:
-                message += " Transaction couldn't be rolled back:", remove_error_msg
-            else:
-                message += " Transaction IS rolled back successfully."
-            self.send_error(code, message=message)
-            return
-        
-        
-        if return_resources:
-            query = {"$or": []}
-            for res_ref in res_refs:
-                query["$or"].append(res_ref)
-            #self.dblayer.find(query, self._return_resources)
-            cursor = self.dblayer.find(query)
-            
-            unescaped = []
-            accept = self.accept_content_type
-            self.set_header("Content-Type", accept + \
-                " ;profile="+ self.schemas_single[accept])
-            self.set_status(201)
-        
-            while (yield cursor.fetch_next):
-                res = cursor.next_object()
-                unescaped.append(ObjectDict.from_mongo(res))
-            
+    def write_psjson(self, resources, full_representation=True):
+        query = {"_id": {'$in': []}}
+        for res in resources:
+            query['_id']['$in'].append(res)
+        cursor = self.dblayer.find(query)
+
+        unescaped = []
+        accept = self.accept_content_type
+        self.set_header("Content-Type", accept +
+                        " ;profile=" + self.schemas_single[accept])
+        self.set_status(201)
+
+        while (yield cursor.fetch_next):
+            res = cursor.next_object()
+            unescaped.append(ObjectDict.from_mongo(res))
+
+        if full_representation is True:
             if len(unescaped) == 1:
                 location = self.request.full_url()
                 if not location.endswith(unescaped[0][self.Id]):
@@ -728,18 +664,12 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
                 self.write(dumps_mongo(unescaped[0], indent=2))
             else:
                 self.write(dumps_mongo(unescaped, indent=2))
-                
-            self.finish()
-            return
         else:
-            accept = self.accept_content_type
-            self.set_header("Content-Type", accept + \
-                " ;profile="+ self.schemas_single[accept])
-            if len(res_refs) == 1:
+            if len(unescaped) == 1:
                 self.set_header("Location",
-                    "%s/%s" % (self.request.full_url(), res_refs[0][self.Id]))
+                    "%s" % (unescaped[0]['selfRef']))
             self.set_status(201)
-            self.finish()
+        self.finish()
 
     def _return_resources(self, request, error=None):
         unescaped = []
