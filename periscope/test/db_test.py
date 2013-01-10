@@ -101,7 +101,7 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
                                              self.collection_name)
 
         # Act
-        cursor = model.find({"num": {"$gte": 2}}, batch_size=1)
+        cursor = model.find({"num": {"$gte": 2}}, batch_size=3)
 
         # Assert
         callback = functools.partial(handle_each)
@@ -124,6 +124,7 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
             results.append(response)
             if len(results) == 3:
                 self.stop()
+                return None
 
         def dummy_callback(response, error=None):
             pass
@@ -132,17 +133,19 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
         self.sync_db[self.collection_name].drop()
         self.sync_db.create_collection(self.collection_name,
                                        capped=True, size=1000)
+        self.sync_db[self.collection_name].insert({"_id": "1", "num": 1})
         model = DBLayerFactory().new_dblayer(self.async_db,
-                                             self.collection_name)
+                                             self.collection_name,
+                                             io_loop=self.io_loop)
         expected = [{u'num': 2, u'id': u'2', u'ts': u'2'},
                     {u'num': 3, u'id': u'3', u'ts': u'3'},
                     {u'num': 4, u'id': u'4', u'ts': u'4'}]
 
         # Act
-        cursor = model.find({"num": {"$gte": 2}}, batch_size=1)
+        cursor = model.find({"num": {"$gte": 2}})
         cursor.tail(each)
         # Insert some test data
-        for i in range(5):
+        for i in range(1, 5):
             model.insert({'_id': str(i), 'id': str(i), 'ts': str(i), 'num': i},
                          callback=dummy_callback)
 

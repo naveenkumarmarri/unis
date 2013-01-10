@@ -39,6 +39,7 @@ See the following example:
     insert_one()
     print_all()
     IOLoop.instance().start()
+
 """
 
 __author__ = 'Ahmed El-Hassany <a.hassany@gmail.com>'
@@ -81,7 +82,7 @@ def object_id():
     return MongoObjectId()
 
 
-class AbstractDBCursor(object):
+class AbstractDBCursor(object, nllog.DoesLogging):
     """Used with the the find database operations.
 
     This class wraps around the native cursor to unify the operations across
@@ -89,11 +90,28 @@ class AbstractDBCursor(object):
     """
     __metaclass__ = abc.ABCMeta
 
-    def __init__(self, native_cursor):
+    def __init__(self, native_cursor, io_loop=None):
         """
         Initialize with the native cursor to wrap around.
         """
+        nllog.DoesLogging.__init__(self)
         self.native_cursor = native_cursor
+        self._ioloop = io_loop or ioloop.IOLoop.instance()
+
+    @abc.abstractproperty
+    def buffer_size(self):
+        """Returns the size of the data buffered in this cursor."""
+        pass
+
+    @abc.abstractproperty
+    def alive(self):
+        """Returns True if the cursor is alive."""
+        pass
+
+    @property
+    def io_loop(self):
+        """Returns a reference to IOLoop instance."""
+        return self._ioloop
 
     @abc.abstractproperty
     def fetch_next(self):
@@ -186,8 +204,6 @@ class _AsyncmongoFetchNext(gen.YieldPoint):
 
 
 class AsyncmongoDBCursor(AbstractDBCursor):
-    # TODO (AH): Fix tailable cursors
-    # TODO (AH): fix each
     """Abstract DBCursor implementation that works with AsyncmongoDBLayer.
 
     :Parameters:
@@ -196,16 +212,24 @@ class AsyncmongoDBCursor(AbstractDBCursor):
 
     See :class:`periscope.db.AbstractDBCursor`.
     """
-    def __init__(self, native_cursor, find_call):
-        super(AsyncmongoDBCursor, self).__init__(native_cursor)
+    def __init__(self, native_cursor, find_call, io_loop=None):
+        super(AsyncmongoDBCursor, self).__init__(native_cursor, io_loop)
         self._data = None
         self._error = None
         self._has_results = False
         self._find_call = find_call
 
     @property
+    def alive(self):
+        """See :attr:`periscope.db.AbstractDBCursor.alive`."""
+        if self.native_cursor is None:
+            return False
+        else:
+            return self.native_cursor.alive
+
+    @property
     def buffer_size(self):
-        """Returns the size of the data buffered in this cursor."""
+        """See :attr:`periscope.db.AbstractDBCursor.buffer_size`."""
         return len(self._data) if self._data is not None else 0
 
     def _find_callback(self, result, error, callback):
@@ -239,7 +263,7 @@ class AsyncmongoDBCursor(AbstractDBCursor):
 
     def _get_more(self, callback):
         """Fetch more data from the database."""
-        if not self.native_cursor.alive:
+        if self.alive is False:
             raise pymongo.errors.InvalidOperation(
                 "Can't call get_more() on a Cursor that has been"
                 " exhausted or killed."
@@ -252,8 +276,7 @@ class AsyncmongoDBCursor(AbstractDBCursor):
         """Actuall invokes the collection.find operation"""
         find_callback = functools.partial(self._find_callback,
                                           callback=callback)
-        cursor = self._find_call(callback=find_callback)
-        self.native_cursor = cursor
+        self.native_cursor = self._find_call(callback=find_callback)
 
     @property
     def fetch_next(self):
@@ -266,6 +289,7 @@ class AsyncmongoDBCursor(AbstractDBCursor):
             raise StopIteration
         return self._data.popleft()
 
+    
     def each(self, callback):
         """See :meth:`periscope.db.AbstractDBCursor.each`"""
         each_callback = functools.partial(self.each, callback=callback)
@@ -275,8 +299,8 @@ class AsyncmongoDBCursor(AbstractDBCursor):
             return
 
         data = self._data or deque([])
-        for datum in data:
-            if callback(datum, self._error) is None:
+        while(len(data)) > 0:
+            if callback(data.pop(), self._error) is None:
                 return
         if len(data) == 0 and self.native_cursor.alive is True:
             self._get_more(callback=each_callback)
@@ -309,29 +333,40 @@ class AsyncmongoDBCursor(AbstractDBCursor):
 
     def tail(self, callback):
         """See :meth:`periscope.db.AbstractDBCursor.tail`"""
-        find_call = self._find_call
-        find_call.keywords['tailable'] = True
-        find_call.keywords['await_data'] = True
-        self._find_call = find_call
-        cursor = self
-        each_callback = functools.partial(cursor._tail_got_more,
-                                          cursor, callback)
-        cursor.each(each_callback)
+        self.log.info("tail.start")
+        # make sure to tailable options
+        self._find_call.keywords['tailable'] = True
+        self._find_call.keywords['await_data'] = True
+        loop = self.io_loop
+        # Make sure that the find call is invoked
+        tail_callback = functools.partial(self.tail, callback=callback)
+        if self._has_results is False:
+            loop.add_callback(functools.partial(self._invoke_find,
+                                                callback=tail_callback))
+            return
 
-    def _tail_got_more(self, cursor, callback, result, error):
-        """Called when the collection that tailed has new data."""
+        data = self._data or deque([])
+        while(len(data)) > 0:
+            if callback(data.pop(), self._error) is None:
+                return
+        if len(data) == 0 and self.alive is True:
+            loop.add_callback(functools.partial(self._get_more,
+                                                callback=tail_callback))
+        else:
+            callback(None, None)
+
+    def _tail_got_more(self, callback, result, error):
+        """Called when the collection that tailed has new data."""     
         if error is not None:
-            cursor.native_cursor.kill()
+            self.native_cursor.kill()
             callback(None, error)
-        elif result is not None:
-            if callback(result, None) is None:
-                cursor.native_cursor.kill()
-                return False
-
-        if not cursor.native_cursor.alive:
-            loop = ioloop.IOLoop.instance()
+        elif callback(result, None) is None:
+            self.native_cursor.kill()
+            return False
+        elif not self.native_cursor.alive:
+            loop = self.io_loop
             loop.add_timeout(time.time() + 0.5,
-                             functools.partial(cursor.tail, callback))
+                             functools.partial(self.tail, callback))
 
 
 class MotorDBCursor(AbstractDBCursor):
@@ -339,8 +374,25 @@ class MotorDBCursor(AbstractDBCursor):
 
     See :class:`periscope.db.AbstractDBCursor`.
     """
-    def __init__(self, native_cursor):
-        super(MotorDBCursor, self).__init__(native_cursor)
+    def __init__(self, native_cursor, io_loop=None):
+        super(MotorDBCursor, self).__init__(native_cursor, io_loop)
+        self._ioloop = ioloop.IOLoop.instance()
+
+    @property
+    def alive(self):
+        """See :attr:`periscope.db.AbstractDBCursor.alive`."""
+        if self.native_cursor is None:
+            return False
+        else:
+            return self.native_cursor.alive
+
+    @property
+    def buffer_size(self):
+        """See :attr:`periscope.db.AbstractDBCursor.buffer_size`."""
+        if self.native_cursor is None:
+            return 0
+        else:
+            return self.native_cursor.buffer_size 
 
     @property
     def fetch_next(self):
@@ -380,12 +432,13 @@ class AbstractDBLayer(object, nllog.DoesLogging):
         collections.
       - `id_field`: The name of the identifier field
       - `timestamp_field`: The name of the timestamp field
+      - `io_loop`: The IOLoop instance
 
     """
     __metaclass__ = abc.ABCMeta
 
     def __init__(self, client, collection_name, capped=False, id_field="id",
-                 timestamp_field="ts"):
+                 timestamp_field="ts", io_loop=None):
         """Creates DBLayer
         """
         nllog.DoesLogging.__init__(self)
@@ -394,11 +447,17 @@ class AbstractDBLayer(object, nllog.DoesLogging):
         self.capped = capped
         self._collection_name = collection_name
         self._client = client
+        self._ioloop = io_loop or ioloop.IOLoop.instance()
 
     @property
     def collection(self):
         """Returns a reference to the collection handled by this layer."""
         return self._client[self._collection_name]
+
+    @property
+    def io_loop(self):
+        """Returns a reference to IOLoop instance."""
+        return self._ioloop
 
     @abc.abstractmethod
     def find(self, query, **kwargs):
@@ -492,6 +551,24 @@ class AsyncmongoDBLayer(IncompleteMongoDBLayer):
 
     See :class:`periscope.db.AbstractDBLayer`.
     """
+    def __init__(self, client, collection_name, capped=False, id_field="id",
+                 timestamp_field="ts", io_loop=None):
+        super(AsyncmongoDBLayer, self).__init__(client=client,
+                                                collection_name=collection_name,
+                                                capped=capped,
+                                                id_field=id_field,
+                                                timestamp_field=timestamp_field,
+                                                io_loop=io_loop)
+        # This a hack to creat synchronouse connection to handle aggregate
+        # functions
+        pool = client._pool
+        kwargs = pool._kwargs.copy()
+        kwargs.pop('io_loop', None)
+        kwargs.pop('pool', None)
+        conn = pymongo.Connection(*pool._args, **kwargs)
+        dbref = conn[pool._dbname]
+        self._sync = dbref[collection_name]
+
     def find(self, query, **kwargs):
         """See :meth:`periscope.db.AbstractDBLayer.find`."""
         self.log.info("find")
@@ -501,7 +578,7 @@ class AsyncmongoDBLayer(IncompleteMongoDBLayer):
             fields["_id"] = 0
         find_call = functools.partial(self.collection.find, query,
                                       fields=fields, **kwargs)
-        return AsyncmongoDBCursor(None, find_call)
+        return AsyncmongoDBCursor(None, find_call, io_loop=self.io_loop)
 
     def _strip_list_callback(self, result, error, callback):
         """
@@ -534,9 +611,13 @@ class AsyncmongoDBLayer(IncompleteMongoDBLayer):
         return ret
 
     def aggregate(self, query, callback, **kwargs):
-        # TODO (AH): Implement this to use aggregate from sync driver
         """See :meth:`periscope.db.AbstractDBLayer.aggregate`."""
-        pass
+        try:
+            result = self._sync.aggregate(query, **kwargs)
+        except Exception as exp:
+            callback(None, exp)
+            return
+        callback(result, None)
 
 
 class MotorDBLayer(IncompleteMongoDBLayer):
@@ -553,7 +634,7 @@ class MotorDBLayer(IncompleteMongoDBLayer):
         cursor = self.collection.find(query,
                                       fields=fields, **kwargs)
         self.log.info('find.end')
-        return MotorDBCursor(cursor)
+        return MotorDBCursor(cursor, io_loop=self.io_loop)
 
     def update(self, query, data, callback=None, **kwargs):
         """See :meth:`periscope.db.AbstractDBLayer.update`."""
