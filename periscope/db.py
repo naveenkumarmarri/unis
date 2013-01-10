@@ -82,6 +82,23 @@ def object_id():
     return MongoObjectId()
 
 
+
+class DBOp(gen.Task):
+    """Makes it easier to deal with gen.Task results."""
+    def __init__(self, func, *args, **kwargs):
+        super(DBOp, self).__init__(func, *args, **kwargs)
+
+    def get_result(self):
+        returned = super(DBOp, self).get_result()
+        print "RETURNED", returned
+        result = returned.args[0]
+        if 'error' in returned.kwargs:
+            error = returned.kwargs['error']
+        else:
+            error = returned.args[1]
+        return result, error
+
+
 class AbstractDBCursor(object, nllog.DoesLogging):
     """Used with the the find database operations.
 
@@ -595,6 +612,7 @@ class AsyncmongoDBLayer(IncompleteMongoDBLayer):
         self.log.debug("_strip_list_callback.start")
         if error is not None:
             callback(result, error)
+            return
         callback(result[0], error)
         self.log.debug("_strip_list_callback.end")
 
