@@ -7,6 +7,14 @@ import functools
 from mock import Mock
 from periscope.db import DBLayerFactory
 from periscope.test.base import PeriscopeTestCase
+from periscope.test.base import MOTOR_INSTALLED
+
+
+# Choose the DBLayer implementation for the unit test
+if MOTOR_INSTALLED is True:
+    from periscope.db import MotorDBLayer as DBLayer
+else:
+    from periscope.db import AsyncmongoDBLayer as DBLayer
 
 
 class DBLayerIntegrationTest(PeriscopeTestCase):
@@ -117,7 +125,7 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
         results = []
 
         def each(response, error=None):
-            """The callback function"""
+            """The Tail callback function"""
             if response is None and error is None:
                 self.stop()
                 return
@@ -125,15 +133,16 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
             if len(results) == 3:
                 self.stop()
                 return None
+            return True
 
         def dummy_callback(response, error=None):
+            """Dummy callback for insert"""
             pass
 
         # Arrange
         self.sync_db[self.collection_name].drop()
         self.sync_db.create_collection(self.collection_name,
                                        capped=True, size=1000)
-        self.sync_db[self.collection_name].insert({"_id": "1", "num": 1})
         model = DBLayerFactory().new_dblayer(self.async_db,
                                              self.collection_name,
                                              io_loop=self.io_loop)
@@ -145,7 +154,7 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
         cursor = model.find({"num": {"$gte": 2}})
         cursor.tail(each)
         # Insert some test data
-        for i in range(1, 5):
+        for i in range(5):
             model.insert({'_id': str(i), 'id': str(i), 'ts': str(i), 'num': i},
                          callback=dummy_callback)
 
@@ -192,7 +201,7 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
         """
         Test aggrefate function
         """
-        expected =  {u'ok': 1.0, u'result': [{u'count': 3, u'_id': None}]}
+        expected = {u'ok': 1.0, u'result': [{u'count': 3, u'_id': None}]}
 
         def handle(response, error=None):
             """The callback function"""
@@ -209,8 +218,8 @@ class DBLayerIntegrationTest(PeriscopeTestCase):
                                              self.collection_name)
 
         # Act
-        result = model.aggregate([{'$group': { '_id': None,
-                                   'count': { '$sum': 1 }}}], callback=handle)
+        result = model.aggregate([{'$group': {'_id': None,
+                                   'count': {'$sum': 1}}}], callback=handle)
 
         # Assert
         self.wait()
@@ -237,7 +246,7 @@ class DBLayerTest(PeriscopeTestCase):
         expected = copy.copy(data)
 
         # Act
-        model = DBLayerFactory().new_dblayer(client, collection_name)
+        model = DBLayer(client, collection_name)
         model.insert(data, callback=callback)
         self.wait()
 
@@ -264,7 +273,7 @@ class DBLayerTest(PeriscopeTestCase):
         callback = Mock(name="remove_callback")
         callback.side_effect = lambda response, error: self.stop()
         # Act
-        model = DBLayerFactory().new_dblayer(client, collection_name)
+        model = DBLayer(client, collection_name)
         model.remove(query, callback=callback)
         self.wait()
         # Assert
@@ -272,31 +281,26 @@ class DBLayerTest(PeriscopeTestCase):
         callback.assert_called_once_with(response, error=None)
 
     def test_find(self):
-        """
-        Test finding a document in the database
-        """
+        """Test find"""
         # Arrange
         response = [{"_id": "2", "num": 2}, {"_id": "3", "num": 3}]
         expected = [{"_id": "2", "num": 2}, {"_id": "3", "num": 3}]
-        query = {"num": {"$gte": 2}, }
-        # This is mock for the mongodb driver
+        query = {"num": {"$gte": 2}}
         collection_name = "collection_find"
         collection = Mock(name=collection_name)
-        collection.find.return_value = "AA"
-        client = Mock(name='async_dbmock', spec_set=self.async_db)
-        #client.__getitem__.value = 'aa'
-        #client
-        # Mock for the callback by the driver
+        collection.find.return_value = None
+        collection.find.side_effect = \
+            lambda *args, **kwargs: kwargs['callback'](response, error=None)
+        client = {collection_name: collection}
         callback = Mock(name="find_callback")
         callback.side_effect = lambda response, error: self.stop()
-
         # Act
-        model = DBLayerFactory().new_dblayer(client, collection_name)
-        cursor = model.find(query)
-
+        model = DBLayer(client, collection_name)
+        model.find(query, callback=callback)
+        self.wait()
         # Assert
         self.assertEqual(collection.find.call_args[0], (query,))
-        self.assertIsNotNone(cursor)
+        callback.assert_called_once_with(expected, error=None)
 
     def test_update(self):
         """
@@ -326,7 +330,7 @@ class DBLayerTest(PeriscopeTestCase):
         callback.side_effect = lambda response, error: self.stop()
 
         # Act
-        model = DBLayerFactory().new_dblayer(client, collection_name)
+        model = DBLayer(client, collection_name)
         model.update(query, data, callback=callback)
         self.wait()
 

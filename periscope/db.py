@@ -289,7 +289,6 @@ class AsyncmongoDBCursor(AbstractDBCursor):
             raise StopIteration
         return self._data.popleft()
 
-    
     def each(self, callback):
         """See :meth:`periscope.db.AbstractDBCursor.each`"""
         each_callback = functools.partial(self.each, callback=callback)
@@ -348,15 +347,17 @@ class AsyncmongoDBCursor(AbstractDBCursor):
         data = self._data or deque([])
         while(len(data)) > 0:
             if callback(data.pop(), self._error) is None:
+                self.log.info("tail.end")
                 return
         if len(data) == 0 and self.alive is True:
             loop.add_callback(functools.partial(self._get_more,
                                                 callback=tail_callback))
         else:
             callback(None, None)
+            self.log.info("tail.end")
 
     def _tail_got_more(self, callback, result, error):
-        """Called when the collection that tailed has new data."""     
+        """Called when the collection that tailed has new data."""
         if error is not None:
             self.native_cursor.kill()
             callback(None, error)
@@ -392,7 +393,7 @@ class MotorDBCursor(AbstractDBCursor):
         if self.native_cursor is None:
             return 0
         else:
-            return self.native_cursor.buffer_size 
+            return self.native_cursor.buffer_size
 
     @property
     def fetch_next(self):
@@ -428,8 +429,8 @@ class AbstractDBLayer(object, nllog.DoesLogging):
         assumed to be established.
       - `collection_name`: the name of the database collection that this layer
         will talk to.
-      - `capped`: True if the collection is capped collection. See MongoDB capped
-        collections.
+      - `capped`: True if the collection is capped collection.
+        See MongoDB capped collections.
       - `id_field`: The name of the identifier field
       - `timestamp_field`: The name of the timestamp field
       - `io_loop`: The IOLoop instance
@@ -553,21 +554,26 @@ class AsyncmongoDBLayer(IncompleteMongoDBLayer):
     """
     def __init__(self, client, collection_name, capped=False, id_field="id",
                  timestamp_field="ts", io_loop=None):
-        super(AsyncmongoDBLayer, self).__init__(client=client,
-                                                collection_name=collection_name,
-                                                capped=capped,
-                                                id_field=id_field,
-                                                timestamp_field=timestamp_field,
-                                                io_loop=io_loop)
+        super(AsyncmongoDBLayer, self).__init__(
+            client=client,
+            collection_name=collection_name,
+            capped=capped,
+            id_field=id_field,
+            timestamp_field=timestamp_field,
+            io_loop=io_loop)
         # This a hack to creat synchronouse connection to handle aggregate
         # functions
-        pool = client._pool
-        kwargs = pool._kwargs.copy()
-        kwargs.pop('io_loop', None)
-        kwargs.pop('pool', None)
-        conn = pymongo.Connection(*pool._args, **kwargs)
-        dbref = conn[pool._dbname]
-        self._sync = dbref[collection_name]
+        try:
+            pool = client._pool
+            kwargs = pool._kwargs.copy()
+            kwargs.pop('io_loop', None)
+            kwargs.pop('pool', None)
+            conn = pymongo.Connection(*pool._args, **kwargs)
+            dbref = conn[pool._dbname]
+            self._sync = dbref[collection_name]
+        except Exception as exp:
+            self.log.error("Cannot create sync db connection '%s'" % exp)
+            self._sync = None
 
     def find(self, query, **kwargs):
         """See :meth:`periscope.db.AbstractDBLayer.find`."""
