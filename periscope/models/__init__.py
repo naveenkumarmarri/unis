@@ -362,7 +362,7 @@ class JSONSchemaModel(ObjectDict):
                             schemas_loader=getattr(self, "_$schemas_loader"))
             elif issubclass(cls, ObjectDict):
                 value = cls(value,
-                            chemas_loader=getattr(self, "_$schemas_loader"))
+                            schemas_loader=getattr(self, "_$schemas_loader"))
             else:
                 value = cls(value)
 

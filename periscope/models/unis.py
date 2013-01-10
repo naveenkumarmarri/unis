@@ -82,7 +82,7 @@ class NetworkResource(JSONSchemaModel):
                       schemas_loader=schemas_loader, auto_id=auto_id,
                       auto_ts=auto_ts)
             obj['selfRef'] = '%s/%s' % (base_url.rstrip('/'), obj['id'])
-            obj._validate()
+            obj.validate()
             out_data.append(obj)
         if is_list:
             return out_data
