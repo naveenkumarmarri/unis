@@ -22,6 +22,14 @@ from periscope.models.unis import Topology
 from periscope.models.unis import Node
 from periscope.models import SCHEMA_LOADER
 from periscope.test.base import PeriscopeHTTPTestCase
+from periscope.test.base import MOTOR_INSTALLED
+
+
+# Choose the DBLayer implementation for the unit test
+if MOTOR_INSTALLED is True:
+    from periscope.db import MotorDBLayer as DBLayer
+else:
+    from periscope.db import AsyncmongoDBLayer as DBLayer
 
 
 MIME = {
