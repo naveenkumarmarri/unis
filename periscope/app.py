@@ -211,13 +211,27 @@ class PeriscopeApplication(tornado.web.Application):
                                         "Connection": "close"},
                                   callback=callback)
 
+    
     @property
-    def async_db(self):
+    def asyncmongo_db(self):
+        """Returns a reference to asyncmongo DB connection."""
+        import asyncmongo
+        if not getattr(self, '_async_db', None):
+            self._async_db = asyncmongo.Client(**settings.ASYNCMONGO_DB)
+        return self._async_db
+
+    @property
+    def motor_db(self):
         """Returns a reference to motor DB connection."""
         if not getattr(self, '_async_db', None):
-            conn = motor.MotorClient(**settings.ASYNC_DB).open_sync()
+            conn = motor.MotorClient(**settings.MOTOR_DB).open_sync()
             self._async_db = conn[settings.DB_NAME]
         return self._async_db
+
+    @property
+    def async_db(self):
+        #return self.asyncmongo_db
+        return self.motor_db
 
     @property
     def sync_db(self):
