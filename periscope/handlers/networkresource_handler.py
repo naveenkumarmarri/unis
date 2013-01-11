@@ -748,7 +748,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
         # Validate schema
         try:
-            resource._validate()
+            resource.validate()
         except Exception as exp:
             self.send_error(400, message="Not valid body " + str(exp))
             return
@@ -779,7 +779,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         profile = self.schemas_single[accept]
         if return_resource:
             query = {"$or": [res_ref]}
-            self.dblayer.find(query, self._return_resources)
+            cursor = self.dblayer.find(query)
+            cursor.to_list(callback=self._return_resources)
         else:
             self.set_header("Content-Type", accept + \
                 ";profile=" +profile)

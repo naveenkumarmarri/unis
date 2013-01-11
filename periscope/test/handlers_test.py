@@ -158,7 +158,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
         self.sync_db[self.collection_name].create_index(
                             [("id", 1), ("ts", 1)], unique=True)
         nodes = self._insert_nodes(5)
-        dblayer = DBLayer(self.async_db, self.collection_name, capped=False)
+        dblayer = DBLayerFactory.new_dblayer(self.async_db, self.collection_name, capped=False)
         content_type = MIME['PSJSON'] + '; profile=' + schemas['networkresource']
         handler = ("/nodes/(?P<res_id>[^\/]*)$", NetworkResourceHandler,
                    dict(dblayer=dblayer,
@@ -187,7 +187,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
         self.sync_db[self.collection_name].create_index(
                             [("id", 1), ("ts", 1)], unique=True)
         nodes = self._insert_nodes(5)
-        dblayer = DBLayer(self.async_db, self.collection_name, capped=True)
+        dblayer = DBLayerFactory.new_dblayer(self.async_db, self.collection_name, capped=True)
         content_type = MIME['PSJSON'] + '; profile=' + schemas['node']
         handler = ("/nodes$", NetworkResourceHandler,
                    dict(dblayer=dblayer,
@@ -213,7 +213,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
         # Arrange
         self.sync_db[self.collection_name].create_index(
                             [("id", 1), ("ts", 1)], unique=True)
-        dblayer = DBLayer(self.async_db, self.collection_name, capped=True)
+        dblayer = DBLayerFactory.new_dblayer(self.async_db, self.collection_name, capped=True)
         content_type = MIME['PSJSON'] + '; profile=' + schemas['networkresource']
         handler = ("/nodes/(?P<res_id>[^\/]*)$", NetworkResourceHandler,
                    dict(dblayer=dblayer,
@@ -330,7 +330,6 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
                                 "Connection": "close"})
         
         # Assert
-        print "Response", response.body
         self.assertEqual(response.code, 201)
         res_id = unicode(response.headers.get('Location', "").split('/')[-1])
         result = self.sync_db[self.collection_name].find_one({'id': res_id}, fields={"_id": 0})
@@ -347,7 +346,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
         # Arrange
         self.sync_db[self.collection_name].create_index(
                             [("id", 1), ("ts", 1)], unique=True)
-        dblayer = DBLayer(self.async_db, self.collection_name, capped=True)
+        dblayer = DBLayerFactory.new_dblayer(self.async_db, self.collection_name, capped=True)
         content_type = MIME['PSJSON'] + '; profile=' + schemas['node']
         nodes_handler = ("/nodes$", NetworkResourceHandler,
                    dict(dblayer=dblayer,
@@ -388,7 +387,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
     def test_put(self):
         # Arrange
         self.sync_db[self.collection_name].create_index([("id", 1), ("ts", 1)], unique=True)
-        dblayer = DBLayer(self.async_db, self.collection_name, capped=True)
+        dblayer = DBLayerFactory.new_dblayer(self.async_db, self.collection_name, capped=True)
         good_request = {
             u"id": u"1",
             u"ts": 1330921125000000 ,
@@ -421,7 +420,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
         self.sync_db[self.collection_name].create_index(
                             [("id", 1), ("ts", 1)], unique=True)
         nodes = self._insert_nodes(5)
-        dblayer = DBLayer(self.async_db, self.collection_name, capped=False)
+        dblayer = DBLayerFactory.new_dblayer(self.async_db, self.collection_name, capped=False)
         content_type = MIME['PSJSON'] + '; profile=' + schemas['networkresource']
         handler = ("/nodes/(?P<res_id>[^\/]*)$", NetworkResourceHandler,
                    dict(dblayer=dblayer,
