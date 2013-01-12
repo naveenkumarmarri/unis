@@ -50,4 +50,3 @@ class Metadata(JSONSchemaModel):
 
 Event = SCHEMA_LOADER.get_class(SCHEMAS["datum"], extends=NetworkResource)
 Data = SCHEMA_LOADER.get_class(SCHEMAS["data"], extends=NetworkResource)
-

@@ -82,7 +82,6 @@ def object_id():
     return MongoObjectId()
 
 
-
 class DBOp(gen.Task):
     """Makes it easier to deal with gen.Task results."""
     def __init__(self, func, *args, **kwargs):

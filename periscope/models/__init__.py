@@ -235,7 +235,7 @@ def schema_meta_factory(name, schema, extends=None):
                 fget = lambda self: self._get_property(name)
                 fset = lambda self, v: self._set_property(name, v)
                 fdel = lambda self: self._del_property(name)
-                return  property(fget, fset, fdel, doc=doc)
+                return property(fget, fset, fdel, doc=doc)
 
             newtype = super(SchemaMetaClass, cls).__new__(cls, classname,
                                                           bases, class_dict)

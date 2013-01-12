@@ -16,7 +16,7 @@ from periscope.settings import SCHEMAS
 
 NETWORK_RESOURCE_SCHEMA = SCHEMA_LOADER.get(SCHEMAS["networkresource"])
 NETWORK_RESOURCE_META = schema_meta_factory("NetworkResourceMeta",
-                                          schema=NETWORK_RESOURCE_SCHEMA)
+                                            schema=NETWORK_RESOURCE_SCHEMA)
 
 
 class NotValidSchema(Exception):
@@ -97,4 +97,5 @@ Path = SCHEMA_LOADER.get_class(SCHEMAS["path"], extends=NetworkResource)
 Service = SCHEMA_LOADER.get_class(SCHEMAS["service"], extends=NetworkResource)
 Network = SCHEMA_LOADER.get_class(SCHEMAS["network"], extends=Node)
 Domain = SCHEMA_LOADER.get_class(SCHEMAS["domain"], extends=NetworkResource)
-Topology = SCHEMA_LOADER.get_class(SCHEMAS["topology"], extends=NetworkResource)
+Topology = SCHEMA_LOADER.get_class(
+    SCHEMAS["topology"], extends=NetworkResource)
