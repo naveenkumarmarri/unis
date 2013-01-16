@@ -89,7 +89,6 @@ class DBOp(gen.Task):
 
     def get_result(self):
         returned = super(DBOp, self).get_result()
-        print "RETURNED", returned
         result = returned.args[0]
         if 'error' in returned.kwargs:
             error = returned.kwargs['error']
