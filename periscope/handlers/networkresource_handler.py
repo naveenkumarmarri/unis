@@ -3,6 +3,10 @@
 Periscope HTTP(s) Handlers.
 """
 
+__author__ = 'Ahmed El-Hassany <a.hassany@gmail.com>'
+__license__ = 'http://www.apache.org/licenses/LICENSE-2.0'
+
+
 import copy
 import json
 import re
@@ -14,13 +18,10 @@ from tornado.ioloop import IOLoop
 import tornado.gen as gen
 import tornado.web
 from tornado.httpclient import HTTPError
-from pymongo.errors import DuplicateKeyError
 from periscope.handlers.sse_handler import SSEHandler
 from periscope.db import DBOp
 from periscope.db import dumps_mongo
 from periscope.models import ObjectDict
-from periscope.models import ObjectDict
-from periscope.models.unis import NetworkResource
 from periscope.models.unis import NotValidSchema
 from periscope.handlers import MIME
 
@@ -532,26 +533,31 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         if accept_content_type not in self.schemas_single:
             message = "Unsupported accept content type '%s'" % \
                         (accept_content_type)
-            self.send_error(406, message=message)
+            self.send_error(406, code=406001, message=message)
             return
         # POST requests don't work on specific IDs
-        if res_id:
+        if res_id is not None:
             message = "NetworkResource ID should not be defined."
-            self.send_error(400, message=message)
+            self.send_error(405, code=405001, message=message)
             return
 
         # Load the appropriate content type specific POST handler
         content_type = self.content_type
+        # TODO (AH): Implement auto dispatch
         if content_type == MIME['PSJSON']:
             self.post_psjson()
         else:
-            self.send_error(415,
-                message="No POST method is implemented fot content type '%s'" % content_type)
+            message = "No POST method is implemented fot content type '%s'" % \
+                content_type
+            self.send_error(415, code=415001, message=message)
             return
         return
 
     def rollback(self, resources, callback):
-        removed = True
+        """
+        Try to delete resources from the database.
+        Expecting a list of ObjectIDs.
+        """
         items_list = []
         for item in resources:
             items_list.append(
@@ -594,7 +600,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.send_error(400, code=400002, message=message)
             return
         except Exception as exp:
-            message = "Clound't deserialize objects from the request: '%s'" \
+            message = "Clound't deserialize resources from the request: '%s'" \
                 % str(exp)
             self.send_error(400, code=400003, message=message)
             return
@@ -639,10 +645,17 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
 
     @gen.engine
-    def write_psjson(self, resources, full_representation=True):
+    def write_psjson(self, resources, full_representation=True,
+        show_location=True):
+        """
+        Writes application/perfsonar+json response to the client.
+        """
         query = {"_id": {'$in': []}}
-        for res in resources:
-            query['_id']['$in'].append(res)
+        if isinstance(resources, list):
+            for res in resources:
+                query['_id']['$in'].append(res)
+        else:
+            query['_id']['$in'].append(resources)
         cursor = self.dblayer.find(query)
 
         unescaped = []
@@ -657,10 +670,11 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
 
         if full_representation is True:
             if len(unescaped) == 1:
-                location = self.request.full_url()
-                if not location.endswith(unescaped[0][self.Id]):
-                    location = location + "/" + unescaped[0][self.Id]
-                self.set_header("Location", location)
+                if show_location is True:
+                    location = self.request.full_url()
+                    if not location.endswith(unescaped[0][self.Id]):
+                        location = location + "/" + unescaped[0][self.Id]
+                    self.set_header("Location", location)
                 self.write(dumps_mongo(unescaped[0], indent=2))
             else:
                 self.write(dumps_mongo(unescaped, indent=2))
@@ -671,121 +685,109 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.set_status(201)
         self.finish()
 
-    def _return_resources(self, request, error=None):
-        unescaped = []
-        accept = self.accept_content_type
-        self.set_header("Content-Type", accept + \
-                " ;profile="+ self.schemas_single[accept])
-        self.set_status(201)
-        try:
-            for res in request:
-                unescaped.append(ObjectDict.from_mongo(res))
-            
-            if len(unescaped) == 1:
-                location = self.request.full_url()
-                if not location.endswith(unescaped[0][self.Id]):
-                    location = location + "/" + unescaped[0][self.Id]
-                self.set_header("Location", location)
-                self.write(dumps_mongo(unescaped[0], indent=2))
-            else:
-                self.write(dumps_mongo(unescaped, indent=2))
-        except Exception as exp:
-            self.send_error(500,
-                    message="Could't process the POST request '%s'" % \
-                        str(exp).replace("\"", "\\\""))
-            return
-        self.finish()
-
     @tornado.web.asynchronous
     @tornado.web.removeslash
     def put(self, res_id=None):
         # Check if the schema for conetnt type is known to the server
-        if self.accept_content_type not in self.schemas_single:
-            message = "Schema is not defiend fot content of type '%s'" \
-                        % self.accept_content_type
-            self.send_error(500, message=message)
+        accept_content_type = self.accept_content_type 
+        if accept_content_type not in self.schemas_single:
+            message = "Unsupported accept content type '%s'" % \
+                        (accept_content_type)
+            self.send_error(406, code=406002, message=message)
             return
+        
         # PUT requests only work on specific IDs
         if res_id is None:
             message = "NetworkResource ID is not defined."
-            self.send_error(400, message=message)
+            self.send_error(405, code=405002, message=message)
             return
 
         # Load the appropriate content type specific PUT handler
-        if self.content_type == MIME['PSJSON']:
+        # TODO (AH): Implement auto dispatch
+        content_type = self.content_type
+        if content_type == MIME['PSJSON']:
             self.put_psjson(unicode(res_id))
         else:
-            self.send_error(500,
-                message="No put method is implemented fot this content type")
+            message = "No PUT method is implemented fot content type '%s'" % \
+                content_type
+            self.send_error(415, code=415002, message=message)
             return
 
+    @gen.engine
     def put_psjson(self, res_id):
         """
         Validates and inserts HTTP PUT request with Content-Type of psjon.
         """
         try:
             body = json.loads(self.request.body)
-            resource = self._model_class(body, auto_id=False)
-        except Exception as exp:
-            self.send_error(400, message="malformatted json request '%s'." % exp)
-            return
+            if not isinstance(body, dict):
+                raise ValueError("Body is not a dictionary")
+        except ValueError as exp:
+            self.send_error(400, code=400005,
+                            message="malformatted json request '%s'." % exp)
 
-        if self.Id not in resource:
-            resource[self.Id] = res_id
-        
-        if resource[self.Id] != res_id:
-            self.send_error(400,
-                message="Different ids in the URL" + \
-                 "'%s' and in the body '%s'" % (body[self.Id], res_id))
-            return
-        
-        resource["$schema"] = resource.get("$schema", self.schemas_single[MIME['PSJSON']])
-        
-        if resource["$schema"] != self.schemas_single[MIME['PSJSON']]:
-            self.send_error(400,
-                message="Not valid body '%s'; expecting $schema: '%s'." % \
-                (item["$schema"], self.schemas_single[self.accept_content_type]))
-            return
-        # Validate schema
+        # Create objects from the body
+        base_url = "/".join(self.request.full_url().split("/")[:-1])
+        model_class = self._model_class
+
         try:
-            resource.validate()
+            resource = model_class.create_resources(body, base_url,
+                auto_id=False)
+            if self.Id not in resource:
+                resource[self.Id] = res_id
+        except NotValidSchema as exp:
+            message = "Not valid '$schema' field: %s" % str(exp)
+            self.send_error(400, code=400006, message=message)
+            return
         except Exception as exp:
-            self.send_error(400, message="Not valid body " + str(exp))
+            message = "Clound't deserialize resource from the request: '%s'" \
+                % str(exp)
+            self.send_error(400, code=400007, message=message)
             return
-        
-        res_ref = {}
-        res_ref[self.Id] = resource[self.Id]
-        res_ref[self.timestamp] = resource[self.timestamp]
-        callback = functools.partial(self.on_put, res_ref=res_ref, 
-            return_resource=True)
-        self.dblayer.insert(dict(resource.to_mongoiter()), callback=callback)
 
-    def on_put(self, response, error=None, res_ref=None, return_resource=True):
-        """
-        HTTP PUT callback to send the results to the client.
-        """
-        if error:
-            if str(error).find("Integrity") > -1:
-                self.send_error(409,
-                    message="Could't process the PUT request '%s'" % \
-                            str(error).replace("\"", "\\\""))
-            else:
-                self.send_error(500,
-                    message="Could't process the PUT request '%s'" % \
-                            str(error).replace("\"", "\\\""))
+        if resource[self.Id] != res_id:
+            message = "Different IDs in the URL '%s' and in the body '%s'" \
+                % (body[self.Id], res_id)
+            self.send_error(400, code=400008, message=message)
             return
-        
-        accept = self.accept_content_type
-        profile = self.schemas_single[accept]
-        if return_resource:
-            query = {"$or": [res_ref]}
-            cursor = self.dblayer.find(query)
-            cursor.to_list(callback=self._return_resources)
+
+        # Inserting resources to mongodb
+        insert_result, insert_error = yield DBOp(
+            self.dblayer.insert, dict(resource.to_mongoiter()))
+
+        if insert_error is None:
+            # TODO (AH): PUBLISH
+            self.write_psjson(insert_result, show_location=False)
         else:
-            self.set_header("Content-Type", accept + \
-                ";profile=" +profile)
-            self.set_status(201)
-            self.finish()
+            # First try removing inserted items.
+            _, remove_error = yield DBOp(self.rollback, [resource])
+            insert_error = str(insert_error)
+            # Prepare the right error code
+            if 'duplicate key' in insert_error:
+                status_code = 409
+                message = "Conflict: %s." % \
+                    str(insert_error).replace("\"", "\\\"")
+            else:
+                status_code = 500
+                message = "Could't process the PUT request: %s." % \
+                    str(insert_error).replace("\"", "\\\"")
+
+            # Check if the inserted items where removed correctly
+            if remove_error is None:
+                if status_code == 409:
+                    code = 409003
+                else:
+                    code = 500003
+                message += " Transaction IS rolled back successfully."
+            else:
+                if status_code == 409:
+                    code = 409004
+                else:
+                    code = 500004
+                message += " Transaction couldn't be rolled back: %s" \
+                    % str(remove_error)
+            self.send_error(status_code, code=code, message=message)
+            return
 
     def on_connection_close(self):
         self._remove_cursor()
