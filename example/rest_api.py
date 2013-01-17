@@ -9,8 +9,8 @@ import time
 import urllib
 from httplib import HTTPConnection
 
-HOST = "monitor.damslab.org"
-PORT =  8888
+HOST = "dev.incntre.iu.edu"
+PORT =  80
 URL = "http://%s:%s" % (HOST, PORT)
 
 MIME = {
@@ -23,28 +23,29 @@ MIME = {
 }
 
 SCHEMAS = {
-    'networkresource': 'http://monitor.damslab.org/unis/networkresource#',
-    'node': 'http://monitor.damslab.org/unis/node#',
-    'port': 'http://monitor.damslab.org/unis/port#',
-    'link': 'http://monitor.damslab.org/unis/link#',
-    'network': 'http://monitor.damslab.org/unis/network#',
-    'blipp': 'http://monitor.damslab.org/unis/blipp#',
-    'metadata': 'http://monitor.damslab.org/unis/metadata#',
+    'networkresource': 'http://unis.incntre.iu.edu/schema/20120709//networkresource#',
+    'node': 'http://unis.incntre.iu.edu/schema/20120709/node#',
+    'port': 'http://unis.incntre.iu.edu/schema/20120709/port#',
+    'link': 'http://unis.incntre.iu.edu/schema/20120709/link#',
+    'network': 'http://unis.incntre.iu.edu/schema/20120709/network#',
+    'blipp': 'http://unis.incntre.iu.edu/schema/20120709/blipp#',
+    'metadata': 'http://unis.incntre.iu.edu/schema/20120709/metadata#',
 }
 
 
+# Sample Node
 node = {
+    "$schema": SCHEMAS['node'],
     "id": "pc166",
-    "addresses": {
-        "dns": [
-            "pc166.emulab.net",
-            "node1.josecuervo.emulab-net.emulab.net"
-        ]
-    },
+    "name": "pc166.emulab.net",
     "ports": [
         {
             "href": URL + "/ports/pc166_iface0",
-            "rel": "instance"
+            "rel": "full"
+        },
+        {
+            "href": URL + "/ports/pc166_10",
+            "rel": "full"
         }
     ],
     "properties": {
@@ -64,21 +65,14 @@ node = {
     }
 }
 
-
+# Sample Ethernet PORT
 port = {
+    "$schema": SCHEMAS['port'],
     "id": "pc166_iface0",
-    "names": {
-        "ifname": [
-            "eth27"
-        ]
-    },
-    "addresses": {
-        "mac": [
-            "0002b365b8c9"
-        ],
-        "ipv4": [
-            "10.10.1.1"
-        ]
+    "name": "eth27",
+    "address": {
+        "type": "mac",
+        "address":"0002b365b8c9"
     },
     "properties": {
         "pgeni": {
@@ -90,34 +84,67 @@ port = {
     }
 }
 
+# Sample IP PORT
+port2 = {
+    "$schema": SCHEMAS['port'],
+    "id": "pc166_10",
+    "name": "IP port",
+    "address": {
+        "type": "mac",
+        "address":"10.10.10.10"
+    },
+    "relations": {
+        "over": [
+            {
+                "href": URL + "/ports/pc166_iface0",
+                "rel": "full"
+            }
+        ]
+    }
+}
+
 meta1 = {
     "id": "meta1",
-    "subject": {"href": URL + "/ports/pc166_iface0"},
-    "eventTypes": ["ps.port.util"]
+    "subject": {
+        "href": URL + "/ports/pc166_iface0",
+        "rel": "full"
+    },
+    "eventType": "ps.port.util"
 }
 
 meta2 = {
     "id": "meta1",
-    "subject": {"href": URL + "/ports/pc166_iface0"},
-    "eventTypes": ["ps.port.discard"]
+    "subject": {
+        "href": URL + "/ports/pc166_iface0",
+        "rel": "full"
+    },
+    "eventType": "ps.port.discard"
 }
 
 meta3 = {
     "id": "meta3",
-    "subject": {"href": URL + "/ports/pc166_iface0"},
-    "eventTypes": ["ps.port.error"]
+    "subject": {
+        "href": URL + "/ports/pc166_iface0",
+        "rel": "full"
+    },
+    "eventType": "ps.port.error"
 }
 
 meta4 = {
     "id": "meta4",
-    "subject": {"href": URL + "/metadata/meta1"},
-    "eventTypes": ["ps.port.util.avg"]
+    "subject": {
+        "href": URL + "/ports/pc166_iface0",
+        "rel": "full"
+    },
+    "eventType": "ps.port.util.avg"
 }
+
 
 
 # POST and let the server handle the IDs
 # Note node has ID in the body, so Periscope is going to use it
 # Howeever if there is no ID the server will generate one
+print "POSTING new node to UNIS"
 conn = HTTPConnection(HOST, PORT)
 headers = {
         "Accept": MIME["PSJSON"],
@@ -125,24 +152,28 @@ headers = {
     }
 conn.request("POST", "/nodes", json.dumps(node), headers)
 res = conn.getresponse()
-# This should be 202
-print res.status
+node_posted = json.loads(res.read())
+# This should be 201
+print "Node posted and returen status is (it should be 201): ", res.status
 
 
 # Conflict
+print "POSTING the node again, to make a conflict!"
 conn = HTTPConnection(HOST, PORT)
 headers = {
         "Accept": MIME["PSJSON"],
         "Content-Type": MIME["PSJSON"] + "; profile="+ SCHEMAS["node"]
     }
-conn.request("POST", "/nodes", json.dumps(node), headers)
+
+conn.request("POST", "/nodes", json.dumps(node_posted), headers)
 res = conn.getresponse()
 # This should be 409
-print res.status
+print "Node posted and returen status is (it should be 409): ", res.status
 
 
 
 # PUT
+print "HTTP put for specific port"
 conn = HTTPConnection(HOST, PORT)
 headers = {
         "Accept": MIME["PSJSON"],
@@ -151,11 +182,24 @@ headers = {
 conn.request("PUT", "/ports/pc166_iface0" , json.dumps(port), headers)
 res = conn.getresponse()
 # This should be 201
-print res.status
+print "PORT inserted and returen status is (it should be 201): ", res.status
 
+
+# PUT
+print "HTTP put for specific port (again for the IP Port)"
+conn = HTTPConnection(HOST, PORT)
+headers = {
+        "Accept": MIME["PSJSON"],
+        "Content-Type": MIME["PSJSON"] + "; profile="+ SCHEMAS["port"]
+    }
+conn.request("PUT", "/ports/pc166_iface0" , json.dumps(port), headers)
+res = conn.getresponse()
+# This should be 201
+print "PORT inserted and returen status is (it should be 201): ", res.status
 
 
 # POST Multiple Metadata at once
+print "POST Multiple Metadata at once"
 conn = HTTPConnection(HOST, PORT)
 headers = {
         "Accept": MIME["PSJSON"],
@@ -164,7 +208,7 @@ headers = {
 conn.request("POST", "/metadata", json.dumps([meta1, meta2, meta3, meta4]), headers)
 res = conn.getresponse()
 # This should be 202
-print res.status
+print "Metadata inserted and returen status is (it should be 201): ", res.status
 
 
 # Sending Blipp
@@ -179,10 +223,10 @@ for i in range(1000):
 conn = HTTPConnection(HOST, PORT)
 headers = {
         "Accept": MIME["PSJSON"],
-        "Content-Type": MIME["PSJSON"] + "; profile="+ SCHEMAS["blipp"]
+        "Content-Type": MIME["PSJSON"]
     }
 conn.request("POST", "/events", json.dumps(probs), headers)
 res = conn.getresponse()
 # This should be 202
-print res.status
+print res.status, res.read()
 
