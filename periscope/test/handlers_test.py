@@ -134,7 +134,7 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
         node = {
             u"$schema": unicode(schemas['node']),
             u"description": u"This is a test network resource",
-            u"ts": time.time() * 1000,
+            u"ts": int(time.time() * 1000000),
             u"name": unicode(nodeid),
             u"selfRef": "http://example.com/nodes/%s" % nodeid,
             u"lifetimes": [
@@ -340,18 +340,17 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
                                 "Connection": "close"})
         
         # Assert
-        self.assertEqual(response.code, 201)
+        self.assertEqual(response.code, 201, response.body)
         res_id = unicode(response.headers.get('Location', "").split('/')[-1])
         result = self.sync_db[self.collection_name].find_one({'id': res_id}, fields={"_id": 0})
         # Unescape special chars
         result = json.loads(dumps_mongo(result).replace("\\\\$", "$"))
-        result.pop("ts", None)
         result.pop("id", None)
         result.pop("selfRef", None)
-        self.maxDiff = None
+        node.pop("id", None)
+        node.pop("selfRef", None)
         self.assertEqual(result, node)
-        
-    
+
     def test_post_get(self):
         # Arrange
         self.sync_db[self.collection_name].create_index(
@@ -390,8 +389,8 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
                                 "Connection": "close"})
         # Assert
         ret_node = json.loads(get_response.body)
-        ret_node.pop("ts")
         ret_node.pop("selfRef")
+        node.pop("selfRef")
         self.assertEqual(node, ret_node)
     
     def test_put(self):

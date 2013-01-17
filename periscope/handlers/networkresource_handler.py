@@ -23,6 +23,8 @@ from periscope.db import DBOp
 from periscope.db import dumps_mongo, dump_mongo
 from periscope.models import ObjectDict
 from periscope.models.unis import NotValidSchema
+from periscope.models.unis import insert_resource
+from periscope.models.unis import write_psjson
 from periscope.handlers import MIME
 
 
@@ -418,8 +420,9 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.finish()
             return
 
-        self.write_psjson({'$or': results[0]['set']}, is_list=is_list)
-        return
+        yield gen.Task(write_psjson, self, {'$or': results[0]['set']},
+                success_status=200, is_list=is_list, show_location=False)
+        self.finish()
 
     def _find(self, query, callback, fields=None, limit=None):
         """Query the database.
@@ -639,6 +642,9 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         remove_query = {'$or': items_list}
         self.dblayer.remove(remove_query, callback=callback)
 
+    def register_urn(self, urn, schema, url):
+        print "regiserting", urn, schema, url
+        
     @gen.engine
     def post_psjson(self):
         """
@@ -648,135 +654,20 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         
         if not profile:
             return
-        try:
-            body = json.loads(self.request.body)
-            if not isinstance(body, dict) and not isinstance(body, list):
-                raise ValueError("Body is not a dictionary nor a list")
-        except ValueError as exp:
-            self.send_error(400, code=400001,
-                            message="malformatted json request '%s'." % exp)
 
         # Create objects from the body
         base_url = self.request.full_url()
         model_class = self._model_class
-
-        try:
-            resources = model_class.create_resources(body, base_url)
-            # Make sure it's a list
-            if not isinstance(resources, list):
-                resources = [resources]
-        except NotValidSchema as exp:
-            message = "Not valid '$schema' field: %s" % str(exp)
-            self.send_error(400, code=400002, message=message)
-            return
-        except Exception as exp:
-            message = "Clound't deserialize resources from the request: '%s'" \
-                % str(exp)
-            self.send_error(400, code=400003, message=message)
-            return
-
-        # Inserting resources to mongodb
-        insert_result, insert_error = yield DBOp(
-            self.dblayer.insert,
-            [dict(item.to_mongoiter()) for item in resources])
-
-        if insert_error is None:
-            # TODO (AH): PUBLISH
-            self.write_psjson({'_id': {'$in': insert_result}},
-                success_status=201, is_list=False, show_location=True)
-        elif insert_error:
-            # First try removing inserted items.
-            _, remove_error = yield DBOp(self.rollback, resources)
-            insert_error = str(insert_error)
-            # Prepare the right error code
-            if 'duplicate key' in insert_error:
-                status_code = 409
-                message = "Conflict: %s." % \
-                    str(insert_error).replace("\"", "\\\"")
-            else:
-                status_code = 500
-                message = "Could't process the POST request: %s." % \
-                    str(insert_error).replace("\"", "\\\"")
-
-            # Check if the inserted items where removed correctly
-            if remove_error is None:
-                if status_code == 409:
-                    code = 409001
-                else:
-                    code = 500001
-                message += " Transaction IS rolled back successfully."
-            else:
-                if status_code == 409:
-                    code = 409002
-                else:
-                    code = 500002
-                message += " Transaction couldn't be rolled back: %s" \
-                    % str(remove_error)
-            self.send_error(status_code, code=code, message=message)
-            return
-
-    @gen.engine
-    def write_psjson(self, query, success_status=200,
-        is_list=True, full_representation=True,
-        show_location=True, include_deleted=False):
-        """
-        Writes application/perfsonar+json response to the client.
-        """
-        def write_header(status=success_status):
-            self.set_status(status)
-            accept = self.accept_content_type
-            self.set_header("Content-Type",
-                accept + " ;profile=" + self.schemas_single[accept])
-
-        cursor = self.dblayer.find(query)
-        first_list = False
-        if is_list is True:
-            self.write("[\n")
-            first_list = True
-        found_one = False
-        while (yield cursor.fetch_next):
-            found_one = True
-            res = cursor.next_object()
-            unescaped = ObjectDict.from_mongo(res)
-            if unescaped.get('status', None) == 'DELETED' and \
-              include_deleted is False:
-                if is_list is True:
-                    continue
-                else:
-                    write_header(410)
-                    #self.set_status(410)
-                    break
-            
-            if is_list is False and show_location is True:
-                location = unescaped.get('selfRef', None)
-                write_header(success_status)
-                if location is not None:
-                    self.set_header("Location", location)
-
-            if first_list is True:
-                first_list = False
-                write_header(success_status)
-            elif is_list is True:
-                self.write(",\n")
-            if full_representation is True:
-                self.write(dumps_mongo(unescaped, indent=2))
-            else:
-                self.write({'href': unescaped['selfRef'], self.timestamp: unescaped[self.timestamp]})
-            if is_list is False:
-                break
-
-        if found_one is False:
-            if is_list is False:
-                write_header(404)
-            else:
-                write_header(success_status)
-
-        if is_list is True:
-            self.write("\n]\n")
         
-        self.write("\n")
+        result, error = yield DBOp(model_class.insert_resource,
+            self.dblayer, self.request.body, base_url)
+        
+        if error is None:
+            yield gen.Task(write_psjson, self, {'_id': {'$in': result}},
+                success_status=201, is_list=False, show_location=True)
+        else:
+            self.send_error(**error)
         self.finish()
-        return
 
     @tornado.web.asynchronous
     @tornado.web.removeslash
@@ -812,18 +703,22 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         """
         Validates and inserts HTTP PUT request with Content-Type of psjon.
         """
-        try:
-            body = json.loads(self.request.body)
-            if not isinstance(body, dict):
-                raise ValueError("Body is not a dictionary")
-        except ValueError as exp:
-            self.send_error(400, code=400005,
-                            message="malformatted json request '%s'." % exp)
-
         # Create objects from the body
         base_url = "/".join(self.request.full_url().split("/")[:-1])
         model_class = self._model_class
 
+        result, error = yield DBOp(model_class.insert_resource,
+            self.dblayer, self.request.body, base_url)
+        
+        if error is None:
+            yield gen.Task(write_psjson, self, {'_id': {'$in': result}},
+                success_status=201, is_list=False, show_location=True)
+        else:
+            self.send_error(**error)
+        self.finish()
+        
+        return
+        
         try:
             resource = model_class.create_resources(body, base_url,
                 auto_id=False)
@@ -845,44 +740,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.send_error(400, code=400008, message=message)
             return
 
-        # Inserting resources to mongodb
-        insert_result, insert_error = yield DBOp(
-            self.dblayer.insert, dict(resource.to_mongoiter()))
-
-        if insert_error is None:
-            # TODO (AH): PUBLISH
-            self.write_psjson({'_id': {'$in': [insert_result]}},
-                success_status=201, is_list=False, show_location=True)
-        else:
-            # First try removing inserted items.
-            _, remove_error = yield DBOp(self.rollback, [resource])
-            insert_error = str(insert_error)
-            # Prepare the right error code
-            if 'duplicate key' in insert_error:
-                status_code = 409
-                message = "Conflict: %s." % \
-                    str(insert_error).replace("\"", "\\\"")
-            else:
-                status_code = 500
-                message = "Could't process the PUT request: %s." % \
-                    str(insert_error).replace("\"", "\\\"")
-
-            # Check if the inserted items where removed correctly
-            if remove_error is None:
-                if status_code == 409:
-                    code = 409003
-                else:
-                    code = 500003
-                message += " Transaction IS rolled back successfully."
-            else:
-                if status_code == 409:
-                    code = 409004
-                else:
-                    code = 500004
-                message += " Transaction couldn't be rolled back: %s" \
-                    % str(remove_error)
-            self.send_error(status_code, code=code, message=message)
-            return
+        insert_resource(self, model_class, body, base_url)
 
     def on_connection_close(self):
         self._remove_cursor()
