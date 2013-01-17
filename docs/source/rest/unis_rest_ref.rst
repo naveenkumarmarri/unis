@@ -18,3 +18,4 @@ This API reference is organized by resource type.
    network_ref
    topology_ref
    metadata_ref
+   error_codes
