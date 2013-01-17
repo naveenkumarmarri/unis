@@ -529,10 +529,10 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     @tornado.web.removeslash
     def post(self, res_id=None):
         # Check if the schema for conetnt type is known to the server
-        accept_content_type = self.accept_content_type 
+        accept_content_type = self.accept_content_type
         if accept_content_type not in self.schemas_single:
             message = "Unsupported accept content type '%s'" % \
-                        (accept_content_type)
+                (accept_content_type)
             self.send_error(406, code=406001, message=message)
             return
         # POST requests don't work on specific IDs
@@ -690,10 +690,10 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     @tornado.web.removeslash
     def put(self, res_id=None):
         # Check if the schema for conetnt type is known to the server
-        accept_content_type = self.accept_content_type 
+        accept_content_type = self.accept_content_type
         if accept_content_type not in self.schemas_single:
             message = "Unsupported accept content type '%s'" % \
-                        (accept_content_type)
+                (accept_content_type)
             self.send_error(406, code=406002, message=message)
             return
         
@@ -799,10 +799,10 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     @gen.engine
     def delete(self, res_id=None):
         # Check if the schema for conetnt type is known to the server
-        accept_content_type = self.accept_content_type 
+        accept_content_type = self.accept_content_type
         if accept_content_type not in self.schemas_single:
             message = "Unsupported accept content type '%s'" % \
-                        (accept_content_type)
+                (accept_content_type)
             self.send_error(406, code=406003, message=message)
             return
 
@@ -840,7 +840,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
 
         deleted["status"] = "DELETED"
-        deleted["ts"] = int(time.time() * 1000000) 
+        deleted[self.timestamp] = int(time.time() * 1000000) 
         response, error = yield DBOp(self.dblayer.insert, deleted)
         if error is not None:
             message = "Couldn't delete resource: '%s'." % str(error)
