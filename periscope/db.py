@@ -47,10 +47,10 @@ __license__ = 'http://www.apache.org/licenses/LICENSE-2.0'
 
 import abc
 import functools
+import json
 import time
 import pymongo
 from bson.objectid import ObjectId as MongoObjectId
-from bson.json_util import dumps
 from collections import deque
 from netlogger import nllog
 from tornado import gen
@@ -72,9 +72,30 @@ except ImportError:
     ASYNCMONGO_INSTALLED = False
 
 
+class MongoEncoder(json.JSONEncoder):
+    """Special JSON encoder that converts Mongo ObjectIDs to string"""
+    def _iterencode(self, obj, markers=None):
+        if isinstance(obj, MongoObjectId):
+            return "%s" % str(obj)
+        elif isinstance(obj, dict):
+            for key in obj:
+                if '$DOT$' in key:
+                    obj[key.replace('$DOT$', '.')] = obj.pop(key)
+                if '\$' in key:
+                    obj[key.replace('\\$', '$')] = obj.pop(key)
+            return json.JSONEncoder._iterencode(self, obj, markers)
+        else:
+            return json.JSONEncoder._iterencode(self, obj, markers)
+
+
+def dump_mongo(obj, fp, **kwargs):
+    """Write to  fileGenerate a mongodb document for an object."""
+    return json.dump(obj, fp, cls=MongoEncoder, **kwargs)
+
+
 def dumps_mongo(obj, **kwargs):
     """Generate a mongodb document for an object."""
-    return dumps(obj, **kwargs)
+    return json.dumps(obj, cls=MongoEncoder, **kwargs)
 
 
 def object_id():
