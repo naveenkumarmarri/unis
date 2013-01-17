@@ -20,7 +20,7 @@ import tornado.web
 from tornado.httpclient import HTTPError
 from periscope.handlers.sse_handler import SSEHandler
 from periscope.db import DBOp
-from periscope.db import dumps_mongo
+from periscope.db import dumps_mongo, dump_mongo
 from periscope.models import ObjectDict
 from periscope.models.unis import NotValidSchema
 from periscope.handlers import MIME
@@ -335,10 +335,11 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     def get(self, res_id=None):
         """Handles HTTP GET"""
         accept = self.accept_content_type
-        if res_id:
+        if res_id is not None:
             self._res_id = unicode(res_id)
         else:
             self._res_id = None
+        # Parses the arguments in the URL
         parsed = self._parse_get_arguments()
         query = parsed["query"]
         fields = parsed["fields"]
@@ -347,10 +348,78 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         if query:
             is_list = True
         if is_list:
-            query["status"] = {"$ne": "DELETED"}
+            pass
+            #query["status"] = {"$ne": "DELETED"}
         callback = functools.partial(self._get_on_response,
-                            new=True, is_list=is_list, query=query)
-        self._find(query, callback, fields=fields, limit=limit)
+            new=True, is_list=is_list, query=query)
+        #self._find(query, callback, fields=fields, limit=limit)
+        self.get_psjson(self._res_id, query, is_list=is_list,
+            fields=fields, limit=limit)
+    
+    @gen.engine
+    def get_psjson(self, res_id, query, is_list=False, fields=None, limit=None):
+        keep_alive = self.supports_streaming or self.supports_sse()
+        if res_id is not None:
+            query[self.Id] = res_id
+        options = dict(query=query)#, await_data=True)
+        # Makes it a tailable cursor
+        if keep_alive and self._tailable:
+            options.update(dict(tailable=True, timeout=False))
+        if fields:
+            options["fields"] = fields
+        if limit:
+            options["limit"] = limit
+        if "sort" not in options:
+            options["sort"] = []
+        options["sort"].append(("ts", -1))
+        
+        include_deleted = False
+        only_most_recent = True
+        
+        aggregate_query = [{'$match': query}]
+        
+        if only_most_recent is True:
+            aggregate_ts = {
+                '$group': {
+                    '_id': {'_id': '$%s' % self.Id, 'selfRef': '$selfRef'},
+                    self.timestamp: {'$max': '$%s' % self.timestamp}}}
+            project_id_set = {'$project': {
+                self.Id: '$_id.%s' % self.Id,
+                self.timestamp: '$%s' % self.timestamp}}
+            aggregate_query.append(aggregate_ts)
+        else:
+            project_id_set = {'$project':
+                    {
+                        self.Id: '$%s' % self.Id,
+                        self.timestamp: '$%s' % self.timestamp}}
+
+        aggregate_id_set = {
+            '$group': {
+                '_id': None,
+                "set": {
+                    '$addToSet': {
+                        self.Id: '$%s' % self.Id, 
+                        self.timestamp: '$%s' % self.timestamp}}}}
+
+        aggregate_query.append(project_id_set)
+        aggregate_query.append(aggregate_id_set)
+        results, error = yield DBOp(self.dblayer.aggregate, aggregate_query)
+        if error is not None:
+            self.send_error(500, code=404001, message="error: %s" % str(error))
+            return
+
+        results = results.pop("result", [])
+        if len(results) == 0:
+            results.append(dict(set=[]))
+        if results[0]['set'] == [{}]:
+            results[0]['set'] = []
+        if len(results[0]['set']) == 0 and is_list is False:
+            self.set_status(404)
+            self.finish()
+            return
+
+        self.write_psjson({'$or': results[0]['set']}, is_list=is_list)
+        return
 
     def _find(self, query, callback, fields=None, limit=None):
         """Query the database.
@@ -613,7 +682,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
 
         if insert_error is None:
             # TODO (AH): PUBLISH
-            self.write_psjson(insert_result)
+            self.write_psjson({'_id': {'$in': insert_result}},
+                success_status=201, is_list=False, show_location=True)
         elif insert_error:
             # First try removing inserted items.
             _, remove_error = yield DBOp(self.rollback, resources)
@@ -646,45 +716,67 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
 
     @gen.engine
-    def write_psjson(self, resources, full_representation=True,
-        show_location=True):
+    def write_psjson(self, query, success_status=200,
+        is_list=True, full_representation=True,
+        show_location=True, include_deleted=False):
         """
         Writes application/perfsonar+json response to the client.
         """
-        query = {"_id": {'$in': []}}
-        if isinstance(resources, list):
-            for res in resources:
-                query['_id']['$in'].append(res)
-        else:
-            query['_id']['$in'].append(resources)
+        def write_header(status=success_status):
+            self.set_status(status)
+            accept = self.accept_content_type
+            self.set_header("Content-Type",
+                accept + " ;profile=" + self.schemas_single[accept])
+
         cursor = self.dblayer.find(query)
-
-        unescaped = []
-        accept = self.accept_content_type
-        self.set_header("Content-Type", accept +
-                        " ;profile=" + self.schemas_single[accept])
-        self.set_status(201)
-
+        first_list = False
+        if is_list is True:
+            self.write("[\n")
+            first_list = True
+        found_one = False
         while (yield cursor.fetch_next):
+            found_one = True
             res = cursor.next_object()
-            unescaped.append(ObjectDict.from_mongo(res))
-
-        if full_representation is True:
-            if len(unescaped) == 1:
-                if show_location is True:
-                    location = self.request.full_url()
-                    if not location.endswith(unescaped[0][self.Id]):
-                        location = location + "/" + unescaped[0][self.Id]
+            unescaped = ObjectDict.from_mongo(res)
+            if unescaped.get('status', None) == 'DELETED' and \
+              include_deleted is False:
+                if is_list is True:
+                    continue
+                else:
+                    write_header(410)
+                    #self.set_status(410)
+                    break
+            
+            if is_list is False and show_location is True:
+                location = unescaped.get('selfRef', None)
+                write_header(success_status)
+                if location is not None:
                     self.set_header("Location", location)
-                self.write(dumps_mongo(unescaped[0], indent=2))
-            else:
+
+            if first_list is True:
+                first_list = False
+                write_header(success_status)
+            elif is_list is True:
+                self.write(",\n")
+            if full_representation is True:
                 self.write(dumps_mongo(unescaped, indent=2))
-        else:
-            if len(unescaped) == 1:
-                self.set_header("Location",
-                    "%s" % (unescaped[0]['selfRef']))
-            self.set_status(201)
+            else:
+                self.write({'href': unescaped['selfRef'], self.timestamp: unescaped[self.timestamp]})
+            if is_list is False:
+                break
+
+        if found_one is False:
+            if is_list is False:
+                write_header(404)
+            else:
+                write_header(success_status)
+
+        if is_list is True:
+            self.write("\n]\n")
+        
+        self.write("\n")
         self.finish()
+        return
 
     @tornado.web.asynchronous
     @tornado.web.removeslash
@@ -759,7 +851,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
 
         if insert_error is None:
             # TODO (AH): PUBLISH
-            self.write_psjson(insert_result, show_location=False)
+            self.write_psjson({'_id': {'$in': [insert_result]}},
+                success_status=201, is_list=False, show_location=True)
         else:
             # First try removing inserted items.
             _, remove_error = yield DBOp(self.rollback, [resource])

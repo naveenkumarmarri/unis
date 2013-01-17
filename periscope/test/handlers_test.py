@@ -134,7 +134,9 @@ class NetworkResourceHandlerIntegrationTest(PeriscopeHTTPTestCase):
         node = {
             u"$schema": unicode(schemas['node']),
             u"description": u"This is a test network resource",
+            u"ts": time.time() * 1000,
             u"name": unicode(nodeid),
+            u"selfRef": "http://example.com/nodes/%s" % nodeid,
             u"lifetimes": [
                 {
                     u"start": u"2012-03-01T13:00:00Z",
