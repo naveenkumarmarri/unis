@@ -537,7 +537,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
         # POST requests don't work on specific IDs
         if res_id is not None:
-            message = "NetworkResource ID should not be defined."
+            message = "Cannot POST to specific ID." + \
+                " Try posting without an ID at the end of the URL."
             self.send_error(405, code=405001, message=message)
             return
 
@@ -698,7 +699,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         
         # PUT requests only work on specific IDs
         if res_id is None:
-            message = "NetworkResource ID is not defined."
+            message = "PUT is allowed only for specific resources. Try PUT" + \
+                " to specific resource (with /id at the end of the URL)."
             self.send_error(405, code=405002, message=message)
             return
 
@@ -794,40 +796,54 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     
     @tornado.web.asynchronous
     @tornado.web.removeslash
+    @gen.engine
     def delete(self, res_id=None):
         # Check if the schema for conetnt type is known to the server
-        if self.accept_content_type not in self.schemas_single:
-            message = "Schema is not defiend fot content of type '%s'" \
-                        % self.accept_content_type
-            self.send_error(500, message=message)
+        accept_content_type = self.accept_content_type 
+        if accept_content_type not in self.schemas_single:
+            message = "Unsupported accept content type '%s'" % \
+                        (accept_content_type)
+            self.send_error(406, code=406003, message=message)
             return
-        # PUT requests only work on specific IDs
+
+        # DELETE requests only work on specific IDs
         if res_id is None:
-            message = "NetworkResource ID is not defined."
-            self.send_error(400, message=message)
+            message = "DELETE is allowed only for specific resources." + \
+                " Try DELETE to specific resource " + \
+                "(with /id at the end of the URL)."
+            self.send_error(405, code=405003, message=message)
             return
-        
-        self._res_id = unicode(res_id)
-        
-        self._find({}, callback=self.on_delete)
-    
-    def on_delete(self, response, error=None):
+
+        # Frist to try to fecth the resource to deleted
+        res_id = unicode(res_id)
+        query = {self.Id: res_id}
+        cursor = self.dblayer.find(query)
+
+        # TODO (AH): use aggregation to fetch the latest element
+        response, error = yield DBOp(cursor.to_list)
         if error is not None:
-            message = str(error)
-            self.send_error(400, message=message)
+            message = "Couldn't load the resource from the database: '%s'." % \
+                str(error)
+            self.send_error(500, code=500005, message=message)
             return
         if len(response) == 0:
-            self.send_error(404)
+            message = "Couldn't find resource with %s='%s'" % (self.Id, res_id)
+            self.send_error(404, code=404002, message=message)
             return
+
         deleted = copy.copy(response[0])
+        # Check that the resource wasn't already deleted
+        if deleted.get("status", None) == "DELETED":
+            message = "Resource already has been deleted at timestamp='%s'." % \
+                str(deleted[self.timestamp])
+            self.send_error(410, code=410001, message=message)
+            return
+
         deleted["status"] = "DELETED"
         deleted["ts"] = int(time.time() * 1000000) 
-        self.dblayer.insert(deleted, callback=self.finish_delete)
-        
-    def finish_delete(self, response, error=None):
+        response, error = yield DBOp(self.dblayer.insert, deleted)
         if error is not None:
-            message = str(error)
-            self.send_error(400, message=message)
+            message = "Couldn't delete resource: '%s'." % str(error)
+            self.send_error(500, code=500006, message=message)
             return
         self.finish()
-
