@@ -23,7 +23,6 @@ from periscope.db import DBOp
 from periscope.db import dumps_mongo, dump_mongo
 from periscope.models import ObjectDict
 from periscope.models.unis import NotValidSchema
-from periscope.models.unis import insert_resource
 from periscope.models.unis import write_psjson
 from periscope.handlers import MIME
 
@@ -665,9 +664,9 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         if error is None:
             yield gen.Task(write_psjson, self, {'_id': {'$in': result}},
                 success_status=201, is_list=False, show_location=True)
+            self.finish()
         else:
             self.send_error(**error)
-        self.finish()
 
     @tornado.web.asynchronous
     @tornado.web.removeslash
@@ -706,41 +705,17 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         # Create objects from the body
         base_url = "/".join(self.request.full_url().split("/")[:-1])
         model_class = self._model_class
-
+        
+        # TODO (AH): validate the ID and the selfref inside the resource 400008
         result, error = yield DBOp(model_class.insert_resource,
             self.dblayer, self.request.body, base_url)
-        
+
         if error is None:
             yield gen.Task(write_psjson, self, {'_id': {'$in': result}},
                 success_status=201, is_list=False, show_location=True)
+            self.finish()
         else:
             self.send_error(**error)
-        self.finish()
-        
-        return
-        
-        try:
-            resource = model_class.create_resources(body, base_url,
-                auto_id=False)
-            if self.Id not in resource:
-                resource[self.Id] = res_id
-        except NotValidSchema as exp:
-            message = "Not valid '$schema' field: %s" % str(exp)
-            self.send_error(400, code=400006, message=message)
-            return
-        except Exception as exp:
-            message = "Clound't deserialize resource from the request: '%s'" \
-                % str(exp)
-            self.send_error(400, code=400007, message=message)
-            return
-
-        if resource[self.Id] != res_id:
-            message = "Different IDs in the URL '%s' and in the body '%s'" \
-                % (body[self.Id], res_id)
-            self.send_error(400, code=400008, message=message)
-            return
-
-        insert_resource(self, model_class, body, base_url)
 
     def on_connection_close(self):
         self._remove_cursor()
