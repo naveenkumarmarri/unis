@@ -65,6 +65,12 @@ class NetworkResource(JSONSchemaModel):
 
         :Parameters:
           - `data`: the input data dict or list of dicts.
+          - `base_url`: the URL of the collection of this resource type.
+          - `set_defaults`: If True the default values will be set
+            if it's not set by the user.
+          - `schemas_loader`:
+          - `auto_id`:
+          - `auto_ts`:
 
         See :class:`periscope.models.unis.NetworkResource` for the rest
         of arguments.
@@ -108,7 +114,7 @@ class NetworkResource(JSONSchemaModel):
 
     @classmethod
     @gen.engine
-    def insert_resource(cls, dblayer, body, base_url, callback):
+    def insert_resource(cls, dblayer, body, base_url, register_urn_call, callback):
         """Inserts A network resource to the database.
 
         :Parameters:
@@ -128,7 +134,7 @@ class NetworkResource(JSONSchemaModel):
         except ValueError as exp:
             message = "malformatted json request '%s'." % exp
             callback(None,
-                error=dict(status_code=400, code=400001, message=message))
+                     error=dict(status_code=400, code=400001, message=message))
             return
 
         try:
@@ -139,13 +145,13 @@ class NetworkResource(JSONSchemaModel):
         except NotValidSchema as exp:
             message = "Not valid '$schema' field: %s" % str(exp)
             callback(None,
-                error=dict(status_code=400, code=400002, message=message))
+                     error=dict(status_code=400, code=400002, message=message))
             return
         except Exception as exp:
             message = "Clound't deserialize resources from the request: '%s'" \
                 % str(exp)
             callback(None,
-                error=dict(status_code=400, code=400003, message=message))
+                     error=dict(status_code=400, code=400003, message=message))
             return
 
         # Inserting resources to mongodb
@@ -153,12 +159,14 @@ class NetworkResource(JSONSchemaModel):
             dblayer.insert, [dict(item.to_mongoiter()) for item in resources])
 
         if insert_error is None:
-            print "RETURN", insert_result
+            if register_urn_call is not None:
+                for resource in resources:
+                    reg_ret, reg_err = yield DBOp(register_urn_call, resource)
             callback(insert_result, error=None)
         else:
             # First try removing inserted items.
             _, remove_error = yield DBOp(NetworkResource._rollback,
-                dblayer, resources)
+                                         dblayer, resources)
             insert_error = str(insert_error)
 
             # Prepare the right error code
@@ -186,7 +194,7 @@ class NetworkResource(JSONSchemaModel):
                 message += " Transaction couldn't be rolled back: %s" \
                     % str(remove_error)
             callback(None, error=dict(status_code=status_code,
-                code=code, message=message))
+                     code=code, message=message))
 
 
 Node = SCHEMA_LOADER.get_class(SCHEMAS["node"], extends=NetworkResource)
@@ -200,14 +208,35 @@ Topology = SCHEMA_LOADER.get_class(
     SCHEMAS["topology"], extends=NetworkResource)
 
 
-def register_urn(handler, urn, schema, url):
-    print "XXX regiserting", urn, schema, url
+def register_urn(urn_dblayer, resource, callback):
+    urn = resource.get('urn', None)
+    schema = resource.get('$schema', None)
+    url = resource.get('selfRef', None)
+    
+    if urn is None:
+        callback(None, error='urn is not defined for this resource')
+        return
+    if schema is None:
+        callback(None, error='$schema is not defined for this resource')
+        return
+    if url is None:
+        callback(None, error='$selfRef is not defined for this resource')
+        return
+    res_type = schema.rstrip('#').split('/')[-1]
+    record = {
+        'urn': urn,
+        'schema': schema,
+        'url': url,
+        'type': res_type,
+    }
+    urn_dblayer.update(record, record, upsert=True, callback=callback)
+    
 
 
 @gen.engine
 def write_psjson(handler, query, callback, success_status=200,
-        is_list=True, full_representation=True,
-        show_location=True, include_deleted=False):
+                 is_list=True, full_representation=True,
+                 show_location=True, include_deleted=False):
     """
     Writes application/perfsonar+json response to the client.
     """

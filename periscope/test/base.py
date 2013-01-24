@@ -47,6 +47,9 @@ class TestApp(tornado.web.Application):
             self._async_db = asyncmongo.Client(**settings.ASYNC_DB)
         return self._async_db
 
+    def register_urn(self, resource, callback):
+        callback(None, None)
+        
     @property
     def motor_db(self):
         """Returns a reference to motor DB connection."""

@@ -19,6 +19,7 @@ from periscope.handlers import MIME
 from settings import SCHEMAS
 from periscope.db import DBLayerFactory
 from periscope.utils import load_class
+from periscope.models.unis import register_urn
 
 # default port
 define("port", default=8888, help="run on the given port", type=int)
@@ -149,7 +150,7 @@ class PeriscopeApplication(tornado.web.Application):
         """A callback if MS is registered"""
         #TODO: This is a hack and should be updated.
         if response.error:
-            print "Couldn't start MS: ERROR", response.error
+            print ("Couldn't start MS: ERROR", response.error)
             import sys
             sys.exit()
         else:
@@ -166,30 +167,30 @@ class PeriscopeApplication(tornado.web.Application):
 
         handlers.append(self._make_main_handler(**settings.main_handler_settings))
         tornado.web.Application.__init__(self, handlers,
-                    default_host="localhost", **settings.APP_SETTINGS)
-
+                    default_host="localhost", **settings.APP_SETTINGS)        
+        
         if settings.MS_ENABLE is True:
             callback = functools.partial(self.MS_registered)
             service = {
-                       u"id": u"ms_" + socket.gethostname(),
-                       u"\$schema": unicode(SCHEMAS["service"]),
-                       u"accessPoint": u"http://%s:8888/" % socket.gethostname(),
-                       u"name": u"ms_" + socket.gethostname(),
-                       u"status": u"ON",
-                       u"serviceType": u"ps:tools:ms",
-                       u"ttl": 1000,
+                       u"id": "ms_" + socket.gethostname(),
+                       "\$schema": unicode(SCHEMAS["service"]),
+                       "accessPoint": "http://%s:8888/" % socket.gethostname(),
+                       "name": "ms_" + socket.gethostname(),
+                       "status": "ON",
+                       "serviceType": "ps:tools:ms",
+                       "ttl": 1000,
                        #u"description": u"sample MS service",
-                       u"runningOn": {
-                                      u"href": u"%s/nodes/%s" % (settings.UNIS_URL, socket.gethostname()),
-                                      u"rel": u"full"
+                       "runningOn": {
+                                      "href": "%s/nodes/%s"% (settings.UNIS_URL, socket.gethostname()),
+                                      "rel": "full"
                                       },
-                       u"properties": {
-                                       u"configurations": {
-                                                           u"default_collection_size": 10000,
-                                                           u"max_collection_size": 20000
+                       "properties": {
+                                       "configurations": {
+                                                           "default_collection_size": 10000,
+                                                           "max_collection_size": 20000
                                                            },
-                                       u"summary": {
-                                                    u"metadata": []
+                                       "summary": {
+                                                    "metadata": []
                                                     }
                                        }
                        }
@@ -211,7 +212,17 @@ class PeriscopeApplication(tornado.web.Application):
                                         "Connection": "close"},
                                   callback=callback)
 
-    
+    def register_urn(self, resource, callback):
+        if not hasattr(self, '_register_urn'):
+            urn_dblayer = DBLayerFactory.new_dblayer(self.async_db,
+                                                     "urn",
+                                                     False,
+                                                     "urn",
+                                                     "ts")
+        
+            self._register_urn = functools.partial(register_urn, urn_dblayer)
+        return self._register_urn(resource, callback)
+
     @property
     def asyncmongo_db(self):
         """Returns a reference to asyncmongo DB connection."""
@@ -247,6 +258,8 @@ def main():
     logger = settings.get_logger()
     logger.info('periscope.start')
     loop = tornado.ioloop.IOLoop.instance()
+    #p = tornado.ioloop.PeriodicCallback(dot, 200, io_loop=loop)
+    #p.start()
     # parse command line options
     tornado.options.parse_command_line()
     app = PeriscopeApplication()

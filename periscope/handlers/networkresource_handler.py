@@ -327,10 +327,6 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         ret_val = {"fields": fields, "limit": limit, "query": query_ret}
         return ret_val
 
-    def _get_cursor(self):
-        """Returns reference to the database cursor."""
-        return self._cursor
-
     @tornado.web.asynchronous
     @tornado.web.removeslash
     def get(self, res_id=None):
@@ -348,11 +344,11 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         is_list = not res_id
         if query:
             is_list = True
-        if is_list:
-            pass
-            #query["status"] = {"$ne": "DELETED"}
-        callback = functools.partial(self._get_on_response,
-            new=True, is_list=is_list, query=query)
+        #if is_list:
+        #    pass
+        #    query["status"] = {"$ne": "DELETED"}
+        #callback = functools.partial(self._get_on_response,
+        #    new=True, is_list=is_list, query=query)
         #self._find(query, callback, fields=fields, limit=limit)
         self.get_psjson(self._res_id, query, is_list=is_list,
             fields=fields, limit=limit)
@@ -423,156 +419,6 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
                 success_status=200, is_list=is_list, show_location=False)
         self.finish()
 
-    def _find(self, query, callback, fields=None, limit=None):
-        """Query the database.
-
-        :Parameters:
-          - `callback`: a function to be called back in case of new data.
-            callback function should have `response`, `error`,
-            and `new` fields. `new` is going to be True.
-
-        """
-        keep_alive = self.supports_streaming or self.supports_sse()
-        if self._res_id:
-            query[self.Id] = self._res_id
-        options = dict(query=query)#, await_data=True)
-        # Makes it a tailable cursor
-        if keep_alive and self._tailable:
-            options.update(dict(tailable=True, timeout=False))
-        if fields:
-            options["fields"] = fields
-        if limit:
-            options["limit"] = limit
-        if "sort" not in options:
-            options["sort"] = []
-        options["sort"].append(("ts", -1))
-        self._query = query
-        self._cursor = self.dblayer.find(**options)
-        self._cursor.to_list(callback=callback)
-
-    def _get_more(self, cursor, callback):
-        """Calls the given callback if there is data available on the cursor.
-
-        :Parameters:
-          - `cursor`: database cursor returned from a find operation.
-          - `callback`: a function to be called back in case of new data.
-            callback function should have `response`, `error`,
-            and `new` fields. `new` is going to be False.
-
-        """
-        # If the client went away,
-        # clean up the  cursor and close the connection
-        if not self.request.connection.stream.socket:
-            self._remove_cursor()
-            self.finish()
-            return
-        # If the cursor is not alive, issue new find to the database
-        if cursor and cursor.native_cursor.alive:
-            cursor.get_more(callback)
-        else:
-            callback.keywords["response"] = []
-            callback.keywords["error"] = None
-            callback.keywords["last_batch"] = True
-            callback()
-
-    def _remove_cursor(self):
-        """Clean up the opened database cursor."""
-        if getattr(self, '_cursor', None):
-            del self._cursor
-
-    def _get_on_response(self, response, error, new=False,
-                        is_list=False, query=None, last_batch=False):
-        """callback for get request
-
-        :Parameters:
-          - `response`: the response body from the database
-          - `error: any error messages from the database.
-          - `new: True if this is the first time to call this method.
-          - `is_list: If True listing is requered, for example /nodes,
-            otherwise it's a single object like /nodes/node_id
-
-        """
-        if error:
-            self.send_error(500, message=error)
-            return
-        keep_alive = self.supports_streaming
-        if new and not response and not is_list:
-            self.send_error(404)
-            return
-        if response and not is_list:
-            response = response[0]
-            if response.get("status", None) == "DELETED":
-                self.set_status(410)
-                self._remove_cursor()
-                self.finish()
-                return
-        cursor = self._get_cursor()
-        response_callback = functools.partial(self._get_on_response,
-                                    new=False, is_list=is_list)
-        get_more_callback = functools.partial(self._get_more,
-                                    cursor, response_callback)
-
-        # This will be called when self._get_more returns empty response
-        if not new and not response and keep_alive and not last_batch:
-            IOLoop.instance().add_callback(get_more_callback)
-            return
-
-        accept = self.accept_content_type
-        self.set_header("Content-Type",
-                    accept + "; profile=" + self.schemas_single[accept])
-        from datetime import datetime
-        self.set_header("Date",
-                    datetime.utcnow())
-        if accept == MIME['PSJSON'] or accept == MIME['JSON']:
-            json_response = dumps_mongo(response,
-                                indent=2).replace('\\\\$', '$').replace('$DOT$', '.')
-            # Mongo sends each batch a separate list, this code fixes that
-            # and makes all the batches as part of single list
-            if is_list:
-                if not new and response:
-                    json_response = "," + json_response.lstrip("[")
-                if not last_batch:
-                    json_response = json_response.rstrip("]")
-                if last_batch:
-                    if not response:
-                        json_response = "]"
-                    else:
-                        json_response += "]"
-            else:
-                if not response:
-                    json_response = ""
-            self.write(json_response)
-        else:
-            # TODO (AH): HANDLE HTML, SSE and other formats
-            json_response = dumps_mongo(response,
-                                indent=2).replace('\\\\$', '$')
-            # Mongo sends each batch a separate list, this code fixes that
-            # and makes all the batches as part of single list
-            if is_list:
-                if not new and response:
-                    json_response = "," + json_response.lstrip("[")
-                if not last_batch:
-                    json_response = json_response.rstrip("]")
-                if last_batch:
-                    if not response:
-                        json_response = "]"
-                    else:
-                        json_response += "]"
-            else:
-                if not response:
-                    json_response = ""
-            self.write(json_response)
-
-        if keep_alive and not last_batch:
-            self.flush()
-            get_more_callback()            
-        else:
-            if last_batch:
-                self._remove_cursor()
-                self.finish()
-            else:
-                get_more_callback()
-
     def _validate_psjson_profile(self):
         """
         Validates if the profile provided with the content-type is valid.
@@ -641,9 +487,6 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         remove_query = {'$or': items_list}
         self.dblayer.remove(remove_query, callback=callback)
 
-    def register_urn(self, urn, schema, url):
-        print "regiserting", urn, schema, url
-        
     @gen.engine
     def post_psjson(self):
         """
@@ -659,8 +502,9 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         model_class = self._model_class
         
         result, error = yield DBOp(model_class.insert_resource,
-            self.dblayer, self.request.body, base_url)
-        
+            self.dblayer, self.request.body, base_url,
+            self.application.register_urn)
+            
         if error is None:
             yield gen.Task(write_psjson, self, {'_id': {'$in': result}},
                 success_status=201, is_list=False, show_location=True)
@@ -705,10 +549,11 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         # Create objects from the body
         base_url = "/".join(self.request.full_url().split("/")[:-1])
         model_class = self._model_class
-        
+
         # TODO (AH): validate the ID and the selfref inside the resource 400008
         result, error = yield DBOp(model_class.insert_resource,
-            self.dblayer, self.request.body, base_url)
+            self.dblayer, self.request.body, base_url,
+            self.application.register_urn)
 
         if error is None:
             yield gen.Task(write_psjson, self, {'_id': {'$in': result}},
@@ -718,7 +563,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.send_error(**error)
 
     def on_connection_close(self):
-        self._remove_cursor()
+        pass
+        #self._remove_cursor()
     
     @tornado.web.asynchronous
     @tornado.web.removeslash
