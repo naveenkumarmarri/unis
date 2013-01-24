@@ -471,22 +471,6 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
         return
 
-    def rollback(self, resources, callback):
-        """
-        Try to delete resources from the database.
-        Expecting a list of ObjectIDs.
-        """
-        items_list = []
-        for item in resources:
-            items_list.append(
-                {
-                    self.Id: item[self.Id],
-                    self.timestamp: item[self.timestamp]
-                }
-            )
-        remove_query = {'$or': items_list}
-        self.dblayer.remove(remove_query, callback=callback)
-
     @gen.engine
     def post_psjson(self):
         """
