@@ -25,6 +25,7 @@ from periscope.models import ObjectDict
 from periscope.models.unis import NotValidSchema
 from periscope.models.unis import write_psjson
 from periscope.handlers import MIME
+from periscope.handlers.unis import UNISHandler
 
 
 class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
@@ -350,97 +351,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         #callback = functools.partial(self._get_on_response,
         #    new=True, is_list=is_list, query=query)
         #self._find(query, callback, fields=fields, limit=limit)
-        self.get_psjson(self._res_id, query, is_list=is_list,
+        UNISHandler.get(self, self._res_id, query, is_list=is_list,
             fields=fields, limit=limit)
-    
-    @gen.engine
-    def get_psjson(self, res_id, query, is_list=False, fields=None, limit=None):
-        keep_alive = self.supports_streaming or self.supports_sse()
-        if res_id is not None:
-            query[self.Id] = res_id
-        options = dict(query=query)#, await_data=True)
-        # Makes it a tailable cursor
-        if keep_alive and self._tailable:
-            options.update(dict(tailable=True, timeout=False))
-        if fields:
-            options["fields"] = fields
-        if limit:
-            options["limit"] = limit
-        if "sort" not in options:
-            options["sort"] = []
-        options["sort"].append(("ts", -1))
-        
-        include_deleted = False
-        only_most_recent = True
-        
-        aggregate_query = [{'$match': query}]
-        
-        if only_most_recent is True:
-            aggregate_ts = {
-                '$group': {
-                    '_id': {'_id': '$%s' % self.Id, 'selfRef': '$selfRef'},
-                    self.timestamp: {'$max': '$%s' % self.timestamp}}}
-            project_id_set = {'$project': {
-                self.Id: '$_id.%s' % self.Id,
-                self.timestamp: '$%s' % self.timestamp}}
-            aggregate_query.append(aggregate_ts)
-        else:
-            project_id_set = {'$project':
-                    {
-                        self.Id: '$%s' % self.Id,
-                        self.timestamp: '$%s' % self.timestamp}}
-
-        aggregate_id_set = {
-            '$group': {
-                '_id': None,
-                "set": {
-                    '$addToSet': {
-                        self.Id: '$%s' % self.Id, 
-                        self.timestamp: '$%s' % self.timestamp}}}}
-
-        aggregate_query.append(project_id_set)
-        aggregate_query.append(aggregate_id_set)
-        results, error = yield DBOp(self.dblayer.aggregate, aggregate_query)
-        if error is not None:
-            self.send_error(500, code=404001, message="error: %s" % str(error))
-            return
-
-        results = results.pop("result", [])
-        if len(results) == 0:
-            results.append(dict(set=[]))
-        if results[0]['set'] == [{}]:
-            results[0]['set'] = []
-        if len(results[0]['set']) == 0 and is_list is False:
-            self.set_status(404)
-            self.finish()
-            return
-
-        yield gen.Task(write_psjson, self, {'$or': results[0]['set']},
-                success_status=200, is_list=is_list, show_location=False)
-        self.finish()
-
-    def _validate_psjson_profile(self):
-        """
-        Validates if the profile provided with the content-type is valid.
-        """
-        regex = re.compile(".*(?P<p>profile\=(?P<profile>[^\;\ ]*))")
-        content_type = self.request.headers.get("Content-Type", "")
-        # use the default schema
-        if "profile" not in content_type:
-            content_type += ";profile=" + \
-                self.schemas_single[self.accept_content_type]
-        match = re.match(regex, content_type)
-        if not match:
-            self.send_error(400, message="Bad Content Type '%s'" % content_type)
-            return None
-        profile = match.groupdict().get("profile", None)
-        if not profile:
-            self.send_error(400, message="Bad Content Type '%s'" % content_type)
-            return None
-        if profile != self.schemas_single[self.accept_content_type]:
-            self.send_error(400, message="Bad schema '%s'" % profile)
-            return None
-        return profile
 
     @tornado.web.asynchronous
     @tornado.web.removeslash
@@ -463,7 +375,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         content_type = self.content_type
         # TODO (AH): Implement auto dispatch
         if content_type == MIME['PSJSON']:
-            self.post_psjson()
+            UNISHandler.post(self)
         else:
             message = "No POST method is implemented fot content type '%s'" % \
                 content_type
@@ -471,31 +383,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
         return
 
-    @gen.engine
-    def post_psjson(self):
-        """
-        Handles HTTP POST request with Content Type of PSJSON.
-        """
-        profile = self._validate_psjson_profile()
-        
-        if not profile:
-            return
-
-        # Create objects from the body
-        base_url = self.request.full_url()
-        model_class = self._model_class
-        
-        result, error = yield DBOp(model_class.insert_resource,
-            self.dblayer, self.request.body, base_url,
-            self.application.register_urn)
-            
-        if error is None:
-            yield gen.Task(write_psjson, self, {'_id': {'$in': result}},
-                success_status=201, is_list=False, show_location=True)
-            self.finish()
-        else:
-            self.send_error(**error)
-
+    
     @tornado.web.asynchronous
     @tornado.web.removeslash
     def put(self, res_id=None):
@@ -518,33 +406,12 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         # TODO (AH): Implement auto dispatch
         content_type = self.content_type
         if content_type == MIME['PSJSON']:
-            self.put_psjson(unicode(res_id))
+            UNISHandler.put(self, unicode(res_id))
         else:
             message = "No PUT method is implemented fot content type '%s'" % \
                 content_type
             self.send_error(415, code=415002, message=message)
             return
-
-    @gen.engine
-    def put_psjson(self, res_id):
-        """
-        Validates and inserts HTTP PUT request with Content-Type of psjon.
-        """
-        # Create objects from the body
-        base_url = "/".join(self.request.full_url().split("/")[:-1])
-        model_class = self._model_class
-
-        # TODO (AH): validate the ID and the selfref inside the resource 400008
-        result, error = yield DBOp(model_class.insert_resource,
-            self.dblayer, self.request.body, base_url,
-            self.application.register_urn)
-
-        if error is None:
-            yield gen.Task(write_psjson, self, {'_id': {'$in': result}},
-                success_status=201, is_list=False, show_location=True)
-            self.finish()
-        else:
-            self.send_error(**error)
 
     def on_connection_close(self):
         pass
@@ -570,36 +437,4 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.send_error(405, code=405003, message=message)
             return
 
-        # Frist to try to fecth the resource to deleted
-        res_id = unicode(res_id)
-        query = {self.Id: res_id}
-        cursor = self.dblayer.find(query)
-
-        # TODO (AH): use aggregation to fetch the latest element
-        response, error = yield DBOp(cursor.to_list)
-        if error is not None:
-            message = "Couldn't load the resource from the database: '%s'." % \
-                str(error)
-            self.send_error(500, code=500005, message=message)
-            return
-        if len(response) == 0:
-            message = "Couldn't find resource with %s='%s'" % (self.Id, res_id)
-            self.send_error(404, code=404002, message=message)
-            return
-
-        deleted = copy.copy(response[0])
-        # Check that the resource wasn't already deleted
-        if deleted.get("status", None) == "DELETED":
-            message = "Resource already has been deleted at timestamp='%s'." % \
-                str(deleted[self.timestamp])
-            self.send_error(410, code=410001, message=message)
-            return
-
-        deleted["status"] = "DELETED"
-        deleted[self.timestamp] = int(time.time() * 1000000) 
-        response, error = yield DBOp(self.dblayer.insert, deleted)
-        if error is not None:
-            message = "Couldn't delete resource: '%s'." % str(error)
-            self.send_error(500, code=500006, message=message)
-            return
-        self.finish()
+        UNISHandler.delete(self, res_id)

@@ -27,7 +27,7 @@ JSON_SCHEMAS_ROOT = PERISCOPE_ROOT + "/schemas"
 ######################################################################
 UNIS_URL = "http://unis.incntre.iu.edu:8888"
 #UNIS_URL = "http://localhost:8888"
-MS_ENABLE = True
+MS_ENABLE = False
 
 ######################################################################
 # Periscope Application settings.

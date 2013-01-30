@@ -114,7 +114,7 @@ class NetworkResource(JSONSchemaModel):
 
     @classmethod
     @gen.engine
-    def insert_resource(cls, dblayer, body, base_url, register_urn_call, callback):
+    def insert_resource(cls, dblayer, body, base_url, register_urn_call, publish_call, callback):
         """Inserts A network resource to the database.
 
         :Parameters:
@@ -162,6 +162,10 @@ class NetworkResource(JSONSchemaModel):
             if register_urn_call is not None:
                 for resource in resources:
                     reg_ret, reg_err = yield DBOp(register_urn_call, resource)
+            for resource in resources:
+                print "publish_call", publish_call
+                pub_sub, pub_err = yield DBOp(publish_call, resource)
+                print "pub_sub, pub_err", pub_sub, pub_err
             callback(insert_result, error=None)
         else:
             # First try removing inserted items.

@@ -3,6 +3,7 @@ Main Periscope Application
 """
 import pymongo
 import motor
+from tornado import gen
 import tornado.web
 import tornado.ioloop
 import json
@@ -215,13 +216,35 @@ class PeriscopeApplication(tornado.web.Application):
     def register_urn(self, resource, callback):
         if not hasattr(self, '_register_urn'):
             urn_dblayer = DBLayerFactory.new_dblayer(self.async_db,
-                                                     "urn",
-                                                     False,
-                                                     "urn",
-                                                     "ts")
-        
+                "urn", False, "urn", "ts")
             self._register_urn = functools.partial(register_urn, urn_dblayer)
         return self._register_urn(resource, callback)
+    
+    def creat_pubsub(self):
+        if 'pubsub' not in self.sync_db.collection_names():
+            self.sync_db.create_collection('pubsub',
+                capped=True, size=10000)
+        self._pubsub = DBLayerFactory.new_dblayer(self.async_db, 'pubsub', capped=True)
+
+    def publish(self, resource, callback, res_type=None):
+        print "IN PUBLISH lkjsafhdlkasdhflkajsd"
+        if not hasattr(self, '_pubsub'):
+            self.creat_pubsub()
+        tmp ={}
+        tmp['id'] = resource['id']
+        tmp['id'] = resource['id']
+        res_type2 = resource['$schema'].rstrip('#').split('/')[-1]
+        tmp['type'] = res_type or res_type2
+        tmp['resource'] = dict(resource.to_mongoiter())
+        print "Publishing", tmp
+        self._pubsub.insert(tmp, callback)
+    
+    def subscribe(self, query, callback):
+        if not hasattr(self, '_pubsub'):
+            self.creat_pubsub()
+        cursor = self._pubsub.find(query, tailable=True, await_data=True)
+        cursor.each(callback=callback)
+        
 
     @property
     def asyncmongo_db(self):

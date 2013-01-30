@@ -12,7 +12,7 @@ from tornado.testing import AsyncHTTPTestCase
 from periscope.test import settings
 from periscope.db import DBLayerFactory
 from tornado.ioloop import IOLoop
-
+from tornado import gen
 
 # Motor is optional
 MOTOR_INSTALLED = True
@@ -49,7 +49,32 @@ class TestApp(tornado.web.Application):
 
     def register_urn(self, resource, callback):
         callback(None, None)
-        
+
+    def creat_pubsub(self):
+        if 'pubsub' not in self.sync_db.collection_names():
+            self.sync_db.create_collection('pubsub',
+                capped=True, size=10000)
+        self._pubsub = DBLayerFactory.new_dblayer(self.async_db, 'pubsub', capped=True)
+
+    def publish(self, resource, callback, res_type=None):
+        if not hasattr(self, '_pubsub'):
+            self.creat_pubsub()
+        tmp ={}
+        tmp['id'] = resource['id']
+        tmp['id'] = resource['id']
+        res_type2 = resource['$schema'].rstrip('#').split('/')[-1]
+        tmp['type'] = res_type or res_type2
+        tmp['resource'] = dict(resource.to_mongoiter())
+        print "Publishing", tmp
+        self._pubsub.insert(tmp, callback)
+        print "END Publishing"
+
+    def subscribe(self, query, callback):
+        if not hasattr(self, '_pubsub'):
+            self.creat_pubsub()
+        cursor = self._pubsub.find(query, tailable=True, await_data=True)
+        cursor.each(callback=callback)
+
     @property
     def motor_db(self):
         """Returns a reference to motor DB connection."""
