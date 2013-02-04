@@ -20,7 +20,7 @@ setup(
     name="periscope",
     version=version,
     packages=[
-        "periscope", "periscope.handlers", "periscope.models", "periscope.test"
+        "periscope", "periscope.handlers", "periscope.handlers.impl", "periscope.models", "periscope.test"
     ],
     package_data={},
     author="Ahmed El-Hassany",
@@ -35,6 +35,7 @@ setup(
         "greenlet",
         "pymongo>=2.4.1",
         "asyncmongo",
+        "motor",
         "unittest2",
         "netlogger>=4.3.0",
         "validictory>=validictory-0.8.1",
