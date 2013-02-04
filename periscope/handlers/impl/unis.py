@@ -6,15 +6,17 @@ UNIS specific handlers
 __author__ = 'Ahmed El-Hassany <a.hassany@gmail.com>'
 __license__ = 'http://www.apache.org/licenses/LICENSE-2.0'
 
+
 import copy
 import re
 import time
 import tornado.gen as gen
 from periscope.db import DBOp
 from periscope.models.unis import write_psjson
+from periscope.handlers.impl.handlerimpl import GenericHandlerImpl
 
 
-class UNISHandler(object):
+class UNISHandlerImpl(GenericHandlerImpl):
     @classmethod
     def _validate_psjson_profile(cls, handler):
         """
@@ -112,7 +114,7 @@ class UNISHandler(object):
         """
         Handles HTTP POST request with Content Type of PSJSON.
         """
-        profile = UNISHandler._validate_psjson_profile(handler)
+        profile = cls._validate_psjson_profile(handler)
 
         if not profile:
             return
@@ -190,3 +192,11 @@ class UNISHandler(object):
             handler.send_error(500, code=500006, message=message)
             return
         handler.finish()
+
+    @classmethod
+    def publish(cls, handler, resource, callback, res_type=None):
+        return handler.application.publish(resource, callback, res_type)
+
+    @classmethod
+    def subscribe(cls, handler, query, callback):
+        return handler.application.subscribe(query, callback)

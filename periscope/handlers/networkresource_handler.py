@@ -25,7 +25,7 @@ from periscope.models import ObjectDict
 from periscope.models.unis import NotValidSchema
 from periscope.models.unis import write_psjson
 from periscope.handlers import MIME
-from periscope.handlers.unis import UNISHandler
+from periscope.handlers.impl.unis import UNISHandlerImpl
 
 
 class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
@@ -351,7 +351,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         #callback = functools.partial(self._get_on_response,
         #    new=True, is_list=is_list, query=query)
         #self._find(query, callback, fields=fields, limit=limit)
-        UNISHandler.get(self, self._res_id, query, is_list=is_list,
+        UNISHandlerImpl.get(self, self._res_id, query, is_list=is_list,
             fields=fields, limit=limit)
 
     @tornado.web.asynchronous
@@ -375,7 +375,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         content_type = self.content_type
         # TODO (AH): Implement auto dispatch
         if content_type == MIME['PSJSON']:
-            UNISHandler.post(self)
+            UNISHandlerImpl.post(self)
         else:
             message = "No POST method is implemented fot content type '%s'" % \
                 content_type
@@ -406,7 +406,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         # TODO (AH): Implement auto dispatch
         content_type = self.content_type
         if content_type == MIME['PSJSON']:
-            UNISHandler.put(self, unicode(res_id))
+            UNISHandlerImpl.put(self, unicode(res_id))
         else:
             message = "No PUT method is implemented fot content type '%s'" % \
                 content_type
@@ -437,4 +437,4 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             self.send_error(405, code=405003, message=message)
             return
 
-        UNISHandler.delete(self, res_id)
+        UNISHandlerImpl.delete(self, res_id)
