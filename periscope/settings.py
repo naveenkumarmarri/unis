@@ -26,7 +26,7 @@ JSON_SCHEMAS_ROOT = PERISCOPE_ROOT + "/schemas"
 # Tornado settings.
 ######################################################################
 
-ENABLE_SSL = True
+ENABLE_SSL = False
 SSL_OPTIONS = {
     'certfile': os.path.join(PERISCOPE_ROOT, "ssl/server.pem"),
     'keyfile': os.path.join(PERISCOPE_ROOT, "ssl/server.key"),
@@ -39,7 +39,7 @@ SSL_OPTIONS = {
 ######################################################################
 UNIS_URL = "https://unis.incntre.iu.edu:8443"
 #UNIS_URL = "http://localhost:8888"
-MS_ENABLE = True
+MS_ENABLE = False
 
 MS_CLIENT_CERT = "/usr/local/etc/certs/ms_cert.pem"
 MS_CLIENT_KEY = "/usr/local/etc/certs/ms_key.pem"
@@ -51,7 +51,7 @@ GEMINI_NODE_INFO = "/usr/local/etc/node.info"
 ######################################################################
 
 # Enable GENI/ABAC auth support
-ENABLE_AUTH = True
+ENABLE_AUTH = False
 
 # Enable application wide debugging options
 DEBUG = True
@@ -153,6 +153,7 @@ SCHEMAS = {
     'metadata': 'http://unis.incntre.iu.edu/schema/20120709/metadata#',
     'data' : 'http://unis.incntre.iu.edu/schema/20120709/data#',
     'datum' : 'http://unis.incntre.iu.edu/schema/20120709/datum#',
+    'measurement': 'http://unis.incntre.iu.edu/schema/20130416/measurement#',
 }
 
 # Default settings that apply to almost all network resources
@@ -392,6 +393,25 @@ data = dict(default_resource_settings.items() + \
         }.items()
 )
 
+measurements = dict(default_resource_settings.items() + \
+        {
+            "name": "measurements",
+            "pattern": "/measurements$",
+            "model_class": "periscope.models.Measurement",
+            "collection_name": "measurements",
+            "schema": {MIME['PSJSON']: SCHEMAS["measurement"]},
+        }.items()
+)
+measurement = dict(default_resource_settings.items() + \
+        {
+            "name": "measurement",
+            "pattern": "/measurements/(?P<res_id>[^\/]*)$",
+            "model_class": "periscope.models.Measurement",
+            "collection_name": "measurements",
+            "schema": {MIME['PSJSON']: SCHEMAS["measurement"]},
+        }.items()
+)
+
 collections = {
     "links": link,
     "ports": port,
@@ -401,6 +421,7 @@ collections = {
     "networks": network,
     "domains": domain,
     "topologies": topology,
+    "measurements": measurement,
 }
 
 topologies["collections"] = collections
@@ -433,11 +454,13 @@ Resources = {
     "event" : event,
     "data" : data,
     "datas" : datas,
+    "measurements": measurements,
+    "measurement" : measurement,
 }
 
 main_handler_settings = {
     "resources": ["links", "ports", "nodes", "services", "paths",
-        "networks", "domains", "topologies", "events", "datas", "metadatas"],
+        "networks", "domains", "topologies", "events", "datas", "metadatas", "measurements"],
     "name": "main",
     "base_url": "",
     "pattern": "/$",
