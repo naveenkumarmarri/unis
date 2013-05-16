@@ -37,9 +37,9 @@ SSL_OPTIONS = {
 ######################################################################
 # Measurement Store settings.
 ######################################################################
-UNIS_URL = "https://unis.incntre.iu.edu:8443"
-#UNIS_URL = "http://localhost:8888"
-MS_ENABLE = False
+#UNIS_URL = "https://unis.incntre.iu.edu:8443"
+UNIS_URL = "http://localhost:8888"
+MS_ENABLE = True
 
 MS_CLIENT_CERT = "/usr/local/etc/certs/ms_cert.pem"
 MS_CLIENT_KEY = "/usr/local/etc/certs/ms_key.pem"
@@ -68,7 +68,6 @@ APP_SETTINGS = {
 ######################################################################
 # Mongo Database settings
 ######################################################################
-DB_NAME = "periscope_db"
 DB_HOST = "127.0.0.1"
 DB_PORT = 27017
 
@@ -80,7 +79,6 @@ ASYNC_DB = {
     'mincached': 1,
     'maxcached': 50,
     'maxconnections': 250,
-    'dbname': DB_NAME,
 }
 
 # Pymonog specific connection configurations
@@ -333,7 +331,7 @@ topology = dict(default_resource_settings.items() + \
 metadatas = dict(default_resource_settings.items() + \
         {
             "name": "metadatas",
-            "pattern": "/metadata$", 
+            "pattern": "/metadata$",
             "model_class": "periscope.models.Metadata",
             "collection_name": "metadata",
             "schema": {MIME['PSJSON']: SCHEMAS["metadata"]},
@@ -352,7 +350,7 @@ metadata = dict(default_resource_settings.items() + \
 events = dict(default_resource_settings.items() + \
         {
             "name": "events",
-            "pattern": "/events$", 
+            "pattern": "/events$",
             "handler_class" : "periscope.handlers.EventsHandler",
             "model_class": "periscope.models.Event",
             "collection_name": "events_cache",
@@ -374,7 +372,7 @@ event = dict(default_resource_settings.items() + \
 datas = dict(default_resource_settings.items() + \
         {
             "name": "datas",
-            "pattern": "/data$", 
+            "pattern": "/data$",
             "handler_class" : "periscope.handlers.DataHandler",
             "model_class": "periscope.models.Data",
             "collection_name": None,
