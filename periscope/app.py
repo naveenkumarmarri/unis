@@ -27,9 +27,9 @@ from periscope.utils import load_class
 from periscope.pp_interface import PP_INTERFACE as PPI
 
 # default options
-define("port", default=8888, help="run on the given port", type=int)
-define("address", default="0.0.0.0", help="default binding IP address", type=str)
-define("dbname", default="periscope_db", help="default name of mongo database", type=str)
+define("port", default=settings.PORT, help="run on the given port", type=int)
+define("address", default=settings.ADDRESS, help="default binding IP address", type=str)
+define("dbname", default=settings.DB_NAME, help="default name of mongo database", type=str)
 define("enable_ssl", default=settings.ENABLE_SSL, help="Turn SSL on or off", type=bool)
 
 class PeriscopeApplication(tornado.web.Application):

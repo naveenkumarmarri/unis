@@ -26,6 +26,8 @@ JSON_SCHEMAS_ROOT = PERISCOPE_ROOT + "/schemas"
 # Tornado settings.
 ######################################################################
 
+ADDRESS = "0.0.0.0"
+PORT = 8888
 ENABLE_SSL = False
 SSL_OPTIONS = {
     'certfile': os.path.join(PERISCOPE_ROOT, "ssl/server.pem"),
@@ -70,6 +72,7 @@ APP_SETTINGS = {
 ######################################################################
 DB_HOST = "127.0.0.1"
 DB_PORT = 27017
+DB_NAME = "periscope_db"
 
 # Asyncmongo specific connection configurations
 ASYNC_DB = {
