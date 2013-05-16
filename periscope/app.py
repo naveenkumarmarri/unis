@@ -30,7 +30,7 @@ from periscope.pp_interface import PP_INTERFACE as PPI
 define("port", default=8888, help="run on the given port", type=int)
 define("address", default="0.0.0.0", help="default binding IP address", type=str)
 define("dbname", default="periscope_db", help="default name of mongo database", type=str)
-
+define("enable_ssl", default=settings.ENABLE_SSL, help="Turn SSL on or off", type=bool)
 
 class PeriscopeApplication(tornado.web.Application):
     """Defines Periscope Application."""
@@ -304,7 +304,7 @@ def main():
     tornado.options.parse_command_line()
     app = PeriscopeApplication()
 
-    if settings.ENABLE_SSL:
+    if options.enable_ssl:
         ssl_opts = settings.SSL_OPTIONS
 
     http_server = tornado.httpserver.HTTPServer(app, ssl_options=ssl_opts)
