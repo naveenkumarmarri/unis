@@ -26,11 +26,12 @@ from periscope.db import DBLayer
 from periscope.utils import load_class
 from periscope.pp_interface import PP_INTERFACE as PPI
 
-# default options
-define("port", default=settings.PORT, help="run on the given port", type=int)
+# command-line/config options
 define("address", default=settings.ADDRESS, help="default binding IP address", type=str)
-define("dbname", default=settings.DB_NAME, help="default name of mongo database", type=str)
+define("port", default=settings.PORT, help="run on the given port", type=int)
 define("enable_ssl", default=settings.ENABLE_SSL, help="Turn SSL on or off", type=bool)
+define("dbname", default=settings.DB_NAME, help="default name of mongo database", type=str)
+
 
 class PeriscopeApplication(tornado.web.Application):
     """Defines Periscope Application."""
@@ -192,7 +193,7 @@ class PeriscopeApplication(tornado.web.Application):
         self._async_db = None
         self._sync_db = None
         self._ppi_classes = []
-        handlers = []
+        handlers = [(r'/favicon.ico', tornado.web.StaticFileHandler, {'path': settings.PERISCOPE_ROOT + '/favicon.ico'})]
 
         # import and initialize pre/post content processing modules
         for pp in settings.PP_MODULES:

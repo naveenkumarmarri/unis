@@ -29,6 +29,10 @@ JSON_SCHEMAS_ROOT = PERISCOPE_ROOT + "/schemas"
 ADDRESS = "0.0.0.0"
 PORT = 8888
 ENABLE_SSL = False
+
+SSL_CERTFILE = os.path.join(PERISCOPE_ROOT, "ssl/server.pem")
+SSL_KEYFILE = os.path.join(PERISCOPE_ROOT, "ssl/server.key")
+SSL_CA_CERTS = os.path.join(PERISCOPE_ROOT, "ssl/genica.bundle")
 SSL_OPTIONS = {
     'certfile': os.path.join(PERISCOPE_ROOT, "ssl/server.pem"),
     'keyfile': os.path.join(PERISCOPE_ROOT, "ssl/server.key"),
@@ -61,7 +65,7 @@ DEBUG = True
 APP_SETTINGS = {
     'cookie_secret': "43oETzKXQAGaYdkL5gEmGeJJFuYh7EQnp2XdTP1o/Vo=",
     'template_path': os.path.join(os.path.dirname(__file__), "templates/"),
-    'static_path': os.path.join(os.path.dirname(__file__), "static/"),
+    'static_path': os.path.join(os.path.dirname(__file__), ""),
     'xsrf_cookies': False,
     'autoescape': "xhtml_escape",
     'debug': DEBUG,
