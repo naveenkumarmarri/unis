@@ -26,7 +26,7 @@ JSON_SCHEMAS_ROOT = PERISCOPE_ROOT + "/schemas"
 # Tornado settings.
 ######################################################################
 
-ENABLE_SSL = True
+ENABLE_SSL = False
 SSL_OPTIONS = {
     'certfile': os.path.join(PERISCOPE_ROOT, "ssl/server.pem"),
     'keyfile': os.path.join(PERISCOPE_ROOT, "ssl/server.key"),
@@ -37,13 +37,14 @@ SSL_OPTIONS = {
 ######################################################################
 # Measurement Store settings.
 ######################################################################
-UNIS_URL = "https://unis.incntre.iu.edu:8443"
-#UNIS_URL = "http://localhost:8888"
+#UNIS_URL = "https://unis.incntre.iu.edu:8443"
+UNIS_URL = "http://localhost:8888"
 MS_ENABLE = True
 
 MS_CLIENT_CERT = "/usr/local/etc/certs/ms_cert.pem"
 MS_CLIENT_KEY = "/usr/local/etc/certs/ms_key.pem"
-GEMINI_NODE_INFO = "/usr/local/etc/node.info"
+GEMINI_NODE_INFO = None
+
 
 
 ######################################################################
@@ -51,7 +52,10 @@ GEMINI_NODE_INFO = "/usr/local/etc/node.info"
 ######################################################################
 
 # Enable GENI/ABAC auth support
-ENABLE_AUTH = True
+ENABLE_AUTH = False
+
+
+AUTH_UUID = None
 
 # Enable application wide debugging options
 DEBUG = True
@@ -333,7 +337,7 @@ topology = dict(default_resource_settings.items() + \
 metadatas = dict(default_resource_settings.items() + \
         {
             "name": "metadatas",
-            "pattern": "/metadata$", 
+            "pattern": "/metadata$",
             "model_class": "periscope.models.Metadata",
             "collection_name": "metadata",
             "schema": {MIME['PSJSON']: SCHEMAS["metadata"]},
@@ -352,7 +356,7 @@ metadata = dict(default_resource_settings.items() + \
 events = dict(default_resource_settings.items() + \
         {
             "name": "events",
-            "pattern": "/events$", 
+            "pattern": "/events$",
             "handler_class" : "periscope.handlers.EventsHandler",
             "model_class": "periscope.models.Event",
             "collection_name": "events_cache",
@@ -374,7 +378,7 @@ event = dict(default_resource_settings.items() + \
 datas = dict(default_resource_settings.items() + \
         {
             "name": "datas",
-            "pattern": "/data$", 
+            "pattern": "/data$",
             "handler_class" : "periscope.handlers.DataHandler",
             "model_class": "periscope.models.Data",
             "collection_name": None,
