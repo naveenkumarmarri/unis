@@ -64,6 +64,18 @@ business. Or at least you should get some errors that have to do with
 your config. Running with SSL or ABAC turned on may require some
 additional packages. See the configuration section.
 
+*** resetting the database
+UNIS and the MS use mongodb as their backend for storage. You can
+interact with the database directly through various programming
+language APIs, or through the Mongo CLI. For example, to clear the
+database, you would:
+```
+$ mongo
+> use periscope_db
+> db.dropDatabase()
+> exit
+$
+```
 ** Configuration
 Mostly done by editing periscope/settings.py
 
