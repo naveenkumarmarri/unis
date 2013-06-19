@@ -14,6 +14,8 @@ from tornado.options import define
 ######################################################################
 PERISCOPE_ROOT = os.path.dirname(os.path.abspath(__file__)) + os.sep
 sys.path.append(os.path.dirname(os.path.dirname(PERISCOPE_ROOT)))
+#SCHEMA_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache")
+SCHEMA_CACHE_DIR = None
 
 GCF_PATH = "/opt/gcf/src/"
 sys.path.append(os.path.dirname(GCF_PATH))
@@ -53,7 +55,6 @@ MS_CLIENT_KEY = "/usr/local/etc/certs/ms_key.pem"
 GEMINI_NODE_INFO = None
 
 
-
 ######################################################################
 # Periscope Application settings.
 ######################################################################
@@ -61,7 +62,6 @@ GEMINI_NODE_INFO = None
 # Enable GENI/ABAC auth support
 ENABLE_AUTH = False
 AUTH_UUID = None
-
 
 # Enable application wide debugging options
 DEBUG = True
@@ -519,6 +519,8 @@ if GEMINI_NODE_INFO is not None:
         except Exception as e:
             AUTH_UUID = None
             logger.warn("read_settings", msg="Could not find auth_uuid in node configuration")
+else:
+    AUTH_UUID = None
 
 try:
     from M2Crypto import X509
