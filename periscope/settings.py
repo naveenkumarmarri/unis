@@ -15,7 +15,7 @@ from tornado.options import define
 PERISCOPE_ROOT = os.path.dirname(os.path.abspath(__file__)) + os.sep
 sys.path.append(os.path.dirname(os.path.dirname(PERISCOPE_ROOT)))
 #SCHEMA_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache")
-SCHEMA_CACHE_DIR = None
+SCHEMA_CACHE_DIR = True
 
 GCF_PATH = "/opt/gcf/src/gcf/"
 sys.path.append(os.path.dirname(GCF_PATH))
@@ -31,15 +31,10 @@ UNIS_SCHEMAS_USE_LOCAL = True
 
 ENABLE_SSL = True
 SSL_OPTIONS = {
-    'certfile': "/usr/local/etc/certs/server.pem",
-    'keyfile': "/usr/local/etc/certs/server.key",
+    'certfile': "/usr/local/etc/certs/server.pem"),
+    'keyfile': "/usr/local/etc/certs/server.key"),
     'cert_reqs': ssl.CERT_REQUIRED,
-    'ca_certs': "/usr/local/etc/certs/genica.bundle"
-}
-
-CLIENT_SSL_OPTIONS = {
-    'certfile': "/usr/local/etc/certs/ms_cert.pem",
-    'keyfile': "/usr/local/etc/certs/ms_key.pem"
+    'ca_certs': "/usr/local/etc/certs/genica.bundle")
 }
 
 ######################################################################
