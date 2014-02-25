@@ -15,7 +15,7 @@ from tornado.options import define
 PERISCOPE_ROOT = os.path.dirname(os.path.abspath(__file__)) + os.sep
 sys.path.append(os.path.dirname(os.path.dirname(PERISCOPE_ROOT)))
 #SCHEMA_CACHE_DIR = os.path.join(os.path.expanduser("~"), ".cache")
-SCHEMA_CACHE_DIR = "/var/unis/.cache"
+SCHEMA_CACHE_DIR = True
 
 GCF_PATH = "/opt/gcf-2.6/src/gcf/"
 sys.path.append(os.path.dirname(GCF_PATH))
@@ -23,7 +23,7 @@ sys.path.append(os.path.dirname(GCF_PATH))
 AUTH_STORE_DIR = "/opt/periscope-ps-unis/periscope/abac"
 
 JSON_SCHEMAS_ROOT = PERISCOPE_ROOT + "/schemas"
-UNIS_SCHEMAS_USE_LOCAL = False
+UNIS_SCHEMAS_USE_LOCAL = True
 
 ######################################################################
 # Tornado settings.
@@ -31,35 +31,28 @@ UNIS_SCHEMAS_USE_LOCAL = False
 
 ENABLE_SSL = True
 SSL_OPTIONS = {
-    'certfile': "/opt/periscope-ps-unis/periscope/ssl/server.pem",
-    'keyfile': "/opt/periscope-ps-unis/periscope/ssl/server.key",
+    'certfile': "/usr/local/etc/certs/server.pem"),
+    'keyfile': "/usr/local/etc/certs/server.key"),
     'cert_reqs': ssl.CERT_REQUIRED,
-    'ca_certs': "/usr/local/etc/protogeni/ssl/genica.bundle"
-}
-
-CLIENT_SSL_OPTIONS = {
-    'certfile': "/usr/local/etc/certs/ms_cert.pem",
-    'keyfile': "/usr/local/etc/certs/ms_key.pem"
+    'ca_certs': "/usr/local/etc/certs/genica.bundle")
 }
 
 ######################################################################
 # Measurement Store settings.
 ######################################################################
 UNIS_URL = "https://unis.incntre.iu.edu:8443"
-#UNIS_URL = "http://localhost:8888"
-MS_ENABLE = False
+MS_ENABLE = True
 
-MS_CLIENT_CERT = "/usr/local/etc/certs/ms_cert.pem"
-MS_CLIENT_KEY = "/usr/local/etc/certs/ms_key.pem"
-GEMINI_NODE_INFO = None
-
+MS_CLIENT_CERT = "/usr/local/etc/certs/gn_cert.pem"
+MS_CLIENT_KEY = "/usr/local/etc/certs/gn_key.pem"
+GEMINI_NODE_INFO = "/usr/local/etc/node.info"
 
 ######################################################################
 # Periscope Application settings.
 ######################################################################
 
 # Enable GENI/ABAC auth support
-ENABLE_AUTH = True
+ENABLE_AUTH = False
 
 # Enable application wide debugging options
 DEBUG = True
