@@ -23,18 +23,18 @@ sys.path.append(os.path.dirname(GCF_PATH))
 AUTH_STORE_DIR = os.path.join(os.path.dirname(__file__), "abac")
 
 JSON_SCHEMAS_ROOT = PERISCOPE_ROOT + "/schemas"
-UNIS_SCHEMAS_USE_LOCAL = False
+UNIS_SCHEMAS_USE_LOCAL = True
 
 ######################################################################
 # Tornado settings.
 ######################################################################
 
-ENABLE_SSL = False
+ENABLE_SSL = True
 SSL_OPTIONS = {
-    'certfile': os.path.join(PERISCOPE_ROOT, "ssl/server.pem"),
-    'keyfile': os.path.join(PERISCOPE_ROOT, "ssl/server.key"),
+    'certfile': "/usr/local/etc/certs/server.pem"),
+    'keyfile': "/usr/local/etc/certs/server.key"),
     'cert_reqs': ssl.CERT_REQUIRED,
-    'ca_certs': os.path.join(PERISCOPE_ROOT, "ssl/genica.bundle")
+    'ca_certs': "/usr/local/etc/certs/genica.bundle")
 }
 
 CLIENT_SSL_OPTIONS = {
@@ -45,14 +45,12 @@ CLIENT_SSL_OPTIONS = {
 ######################################################################
 # Measurement Store settings.
 ######################################################################
-#UNIS_URL = "https://unis.incntre.iu.edu:8443"
-UNIS_URL = "http://localhost:8888"
+UNIS_URL = "https://unis.incntre.iu.edu:8443"
 MS_ENABLE = True
 
-MS_CLIENT_CERT = "/usr/local/etc/certs/ms_cert.pem"
-MS_CLIENT_KEY = "/usr/local/etc/certs/ms_key.pem"
-GEMINI_NODE_INFO = None
-
+MS_CLIENT_CERT = "/usr/local/etc/certs/gn_cert.pem"
+MS_CLIENT_KEY = "/usr/local/etc/certs/gn_key.pem"
+GEMINI_NODE_INFO = "/usr/local/etc/node.info"
 
 ######################################################################
 # Periscope Application settings.
