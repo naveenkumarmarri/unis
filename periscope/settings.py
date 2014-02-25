@@ -31,10 +31,10 @@ UNIS_SCHEMAS_USE_LOCAL = True
 
 ENABLE_SSL = True
 SSL_OPTIONS = {
-    'certfile': "/usr/local/etc/certs/server.pem"),
-    'keyfile': "/usr/local/etc/certs/server.key"),
+    'certfile': "/usr/local/etc/certs/server.pem",
+    'keyfile': "/usr/local/etc/certs/server.key",
     'cert_reqs': ssl.CERT_REQUIRED,
-    'ca_certs': "/usr/local/etc/certs/genica.bundle")
+    'ca_certs': "/usr/local/etc/certs/genica.bundle"
 }
 
 CLIENT_SSL_OPTIONS = {
