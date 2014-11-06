@@ -162,7 +162,8 @@ SCHEMAS = {
     'data' : 'http://unis.incntre.iu.edu/schema/20140214/data#',
     'datum' : 'http://unis.incntre.iu.edu/schema/20140214/datum#',
     'measurement': 'http://unis.incntre.iu.edu/schema/20140214/measurement#',
-    'file': 'http://unis.incntre.iu.edu/schema/20140909/exnode#'
+    'file': 'http://unis.incntre.iu.edu/schema/20140909/file#',
+    'exnode': 'http://unis.incntre.iu.edu/schema/20140909/exnode#'
 }
 
 # Default settings that apply to almost all network resources
@@ -357,7 +358,6 @@ metadata = dict(default_resource_settings.items() + \
             "schema": {MIME['PSJSON']: SCHEMAS["metadata"]},
         }.items()
 )
-
 events = dict(default_resource_settings.items() + \
         {
             "name": "events",
@@ -379,7 +379,6 @@ event = dict(default_resource_settings.items() + \
             "schema": {MIME['PSJSON']: SCHEMAS["datum"]},
         }.items()
 )
-
 datas = dict(default_resource_settings.items() + \
         {
             "name": "datas",
@@ -390,7 +389,6 @@ datas = dict(default_resource_settings.items() + \
             "schema": {MIME['PSJSON']: SCHEMAS["data"]},
         }.items()
 )
-
 data = dict(default_resource_settings.items() + \
         {
             "name": "data",
@@ -401,7 +399,6 @@ data = dict(default_resource_settings.items() + \
             "schema": {MIME['PSJSON']: SCHEMAS["data"]},
         }.items()
 )
-
 measurements = dict(default_resource_settings.items() + \
         {
             "name": "measurements",
@@ -420,22 +417,21 @@ measurement = dict(default_resource_settings.items() + \
             "schema": {MIME['PSJSON']: SCHEMAS["measurement"]},
         }.items()
 )
-
-exnodes = dict(default_resource_settings.items() + \
+files = dict(default_resource_settings.items() + \
          {
-            "name": "exnodes",
+            "name": "files",
             "pattern": "/files$",
-            "model_class": "periscope.models.Exnode",
-            "collection_name": "exnodes",
+            "model_class": "periscope.models.File",
+            "collection_name": "files",
             "schema": {MIME['PSJSON']: SCHEMAS["file"]},
          }.items()
 )
-exnode = dict(default_resource_settings.items() + \
+file = dict(default_resource_settings.items() + \
          {
-           "name": "exnode",
+           "name": "file",
            "pattern": "/files/(?P<res_id>[^\/]*)$",
-           "model_class": "periscope.models.Exnode",
-           "collection_name": "exnodes",
+           "model_class": "periscope.models.File",
+           "collection_name": "files",
            "schema": {MIME['PSJSON']: SCHEMAS["file"]},
          }.items()
 )
@@ -471,6 +467,7 @@ collections = {
     "domains": domain,
     "topologies": topology,
     "measurements": measurement,
+    "files" : file
 }
 
 topologies["collections"] = collections
@@ -505,8 +502,10 @@ Resources = {
     "datas" : datas,
     "measurements": measurements,
     "measurement" : measurement,
-    "exnodes"     : exnodes,
-    "exnode"      : exnode,
+    "files" : files,
+    "file" : file,
+    #"exnodes"     : exnodes,
+    #"exnode"      : exnode,
 }
 
 Subscriptions = {
@@ -517,7 +516,7 @@ Subscriptions = {
 
 main_handler_settings = {
     "resources": ["links", "ports", "nodes", "services", "paths",
-        "networks", "domains", "topologies", "events", "datas", "metadatas", "measurements", "exnodes"],
+        "networks", "domains", "topologies", "events", "datas", "metadatas", "measurements", "files"],
     "name": "main",
     "base_url": "",
     "pattern": "/$",
