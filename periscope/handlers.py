@@ -40,6 +40,8 @@ from periscope.models import HyperLink
 from periscope.models import Topology
 from periscope.models import schemaLoader
 from periscope.models import JSONSchemaModel
+from periscope import models
+from periscope.models import schemaLoader
 import periscope.utils as utils
 from asyncmongo.errors import IntegrityError, TooManyConnections
 
@@ -71,6 +73,8 @@ CACHE = {
 
 trc = tornadoredis.Client()
 trc.connect()
+query_list = []
+uuid = 0
 
 class SSEHandler(tornado.web.RequestHandler):
     """
@@ -229,6 +233,18 @@ class SSEHandler(tornado.web.RequestHandler):
         except Exception, e:
             self._handle_request_exception(e)
 
+class SchemaHandler(tornado.web.RequestHandler):
+    def initialize(self, base_url):
+        None
+    def get(self, res_id=None):
+        """Handles HTTP GET"""
+        args = self.request.arguments
+        if 'name' in args.keys() and "node" in settings.SCHEMAS:
+            """ Return schema json """
+            self.write(schemaLoader.get(settings.SCHEMAS["node"]))
+        else:
+            self.write(settings.SCHEMAS)
+        self.finish()
 
 class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
     """Generic Network resources handler"""
@@ -514,6 +530,11 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         query.pop("limit", None)
         if limit:
             limit = convert_value_type("limit", limit, "integer")
+                        
+        skip = self.get_argument("skip", default=0)
+        query.pop("skip", None)
+        if skip:
+            skip = convert_value_type("skip", skip, "integer")
         
         query_ret = []
         for arg in query:
@@ -549,7 +570,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
                         ret.append(item)
                 query_ret["query"].update({"$and": ret})
 
-        ret_val = {"fields": fields, "limit": limit, "query": query_ret}
+        ret_val = {"fields": fields, "limit": limit, "query": query_ret , "skip" : skip}
         return ret_val
 
     def _get_cursor(self):
@@ -572,6 +593,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         query = parsed["query"]
         fields = parsed["fields"]
         limit = parsed["limit"]
+        skip = parsed["skip"]
         is_list = not res_id
 
         if query["list"]:
@@ -579,13 +601,12 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         if is_list == False:
             limit = 1
         if is_list:
-            query["query"]["status"] = {"$ne": "DELETED"}
-
+            query["query"]["status"] = {"$ne": "DELETED"}            
         callback = functools.partial(self._get_on_response,
                             new=True, is_list=is_list, query=query["query"])
-        self._find(query["query"], callback, fields=fields, limit=limit)
+        return self._find(query["query"], callback, fields=fields, limit=limit,skip=skip)        
 
-    def _find(self, query, callback, fields=None, limit=None):
+    def _find(self, query, callback, fields=None, limit=None , skip=None):
         """Query the database.
 
         Parameters:
@@ -608,7 +629,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         if "sort" not in options:
             options["sort"] = []
         options["sort"].append(("ts", -1))
-        self._query = query
+        options['skip']=skip
+        self._query = query        
         self._cursor = self.dblayer.find(**options)
 
     def _get_more(self, cursor, callback):
@@ -864,8 +886,7 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         self.dblayer.insert(resources, callback=callback)
 
         for res in resources:
-            trc.publish(res["\$schema"], tornado.escape.json_encode(res))
-            trc.publish(res["\$schema"] + "/" + res["id"], tornado.escape.json_encode(res))
+            self.publish(res)
 
     def on_post(self, request, error=None, res_refs=None, return_resources=True):
         """
@@ -991,9 +1012,8 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
         callback = functools.partial(self.on_put, res_ref=res_ref, 
             return_resource=True)
         self.dblayer.insert(dict(resource._to_mongoiter()), callback=callback)
-
-        trc.publish(resource["$schema"], tornado.escape.json_encode(resource))
-        trc.publish(resource["$schema"] + "/" + resource["id"], tornado.escape.json_encode(resource))
+        self.publish(resource)
+        
 
     def on_put(self, response, error=None, res_ref=None, return_resource=True):
         """
@@ -1063,45 +1083,44 @@ class NetworkResourceHandler(SSEHandler, nllog.DoesLogging):
             return
         self.finish()
 
+    def publish(self, resource):
+        for query in query_list:
+            is_member = True
+            tmpConditions = query["conditions"]
+
+            for condition, value in tmpConditions.iteritems():
+                if condition not in resource or resource[condition] != value:
+                    is_member = False
+                    break
+            if is_member:
+                trc.publish(str(query["channel"]), tornado.escape.json_encode(resource))
+                
+
 class SubscriptionHandler(tornado.websocket.WebSocketHandler):
     def __init__(self, *args, **kwargs):
         super(SubscriptionHandler, self).__init__(*args, **kwargs)
 
-    def open(self, resource_type = None, resource_id = None, query = None):
-        if resource_type is not None:
-            if resource_type in settings.SCHEMAS:
-                channel = settings.SCHEMAS[resource_type]
-                if resource_id is not None:
-                    channel += "/" + resource_id
-                    
-                self.channel = channel
-        else:
-            # TODO: Add channel functionality to arbitrary queries
-            #       Filters should be indexed by uid
-            #       and maintained locally at the Redis level.
-            #       In the future, these filters will need to be
-            #       synced with any other unis instances (possibly) via
-            #       Redis' sharding functionality.
+    def open(self, resource_type = None, resource_id = None):
+        try:
+            query_string = self.get_argument("query", None)
+            query = {}
+            if query_string:
+                query = json.loads(query_string)
             
-            #query = self.get_argument("query")
-            #if query == "":
-            #    self.write_message('Connection failed: Bad resource type or ID')
-            #    return
-            #else:
-            #    jsonQuery = json.loads(query)
-            #    self.channel = self.GenerateChannel(jsonQuery)
-            #    #AddChannelToFilter(channel)
-            
-            self.write_message('Arbitrary Queries not supported at this time')
+            query['\\$schema'] = settings.SCHEMAS[resource_type]
+            if resource_id:
+                query['id'] = resource_id
+        
+            self.channel = self.AddQueryToFilter(query)
+            self.listen()
+        except Exception as exp:
             return
-
-        self.listen()
         
     @tornado.gen.engine
     def listen(self):
         self.client = tornadoredis.Client()
         self.client.connect()
-        yield tornado.gen.Task(self.client.subscribe, self.channel)
+        yield tornado.gen.Task(self.client.subscribe, str(self.channel))
         self.client.listen(self.deliver)
         
     def on_message(self, msg):
@@ -1123,8 +1142,11 @@ class SubscriptionHandler(tornado.websocket.WebSocketHandler):
     def check_origin(self, origin):
         return True
 
-    def GenerateChannel(query):
-        pass
+    def AddQueryToFilter(self, query):
+        global uuid, query_list
+        uuid = uuid + 1
+        query_list.append({ "channel": uuid, "conditions": query })
+        return uuid
 
 class CollectionHandler(NetworkResourceHandler):
     def initialize(self, collections, *args, **kwargs):
