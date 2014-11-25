@@ -59,7 +59,8 @@ class DBLayer(object, nllog.DoesLogging):
         fields["_id"] = 0                        
         findCursor = self.collection.find(query, callback=callback,
                                     fields=fields, **kwargs)        
-        self._client['$cmd'].find_one({'count' : self._collection_name , 'query' : query}, _is_command=True, callback=ccallback)                    
+        if ccallback :
+            self._client['$cmd'].find_one({'count' : self._collection_name , 'query' : query}, _is_command=True, callback=ccallback)                    
         return findCursor 
 
     def _insert_id(self, data):
