@@ -443,6 +443,13 @@ itemSubscription = {
     "handler_class" : "periscope.handlers.SubscriptionHandler"
 }
 
+filePath = {
+    "base_url"      : "",
+    "name"          : "fileSubscription",
+    "pattern"       : "/file/(?P<file_name>[^\/]*)$",
+    "handler_class" : "periscope.handlers.FileSubscriptionHandler"
+}
+
 catSubscription = {
     "base_url"      : "",
     "name"          : "categorySubscription",
